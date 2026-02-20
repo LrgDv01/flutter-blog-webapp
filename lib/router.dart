@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
-import 'package:flutter_blog_webapp/screens/login_screen.dart';
-import 'package:flutter_blog_webapp/screens/register_screen.dart';
-import 'package:flutter_blog_webapp/screens/home_screen.dart';
+import 'package:flutter_blog_webapp/pages/login_page.dart';
+import 'package:flutter_blog_webapp/pages/register_page.dart';
+import 'package:flutter_blog_webapp/pages/home_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
