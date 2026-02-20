@@ -45,6 +45,8 @@ app.*.map.json
 /android/app/release
 
 # Environment variables (secrets)
+assets/.env
+/assets/.env
 .env.local
 *.env
 .env.*.local
