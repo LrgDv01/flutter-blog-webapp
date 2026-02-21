@@ -33,15 +33,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => const LoginPage(),
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        builder: (context, state) => const RegisterPage(),
       ),
       GoRoute(
         path: '/',
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) => const HomePage(),
       ),
     ],
   );

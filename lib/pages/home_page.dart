@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+class HomePage extends ConsumerWidget {
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

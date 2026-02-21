@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 
-class RegisterScreen extends ConsumerStatefulWidget { 
-  const RegisterScreen({super.key});
+class RegisterPage extends ConsumerStatefulWidget { 
+  const RegisterPage({super.key});
   
   @override
-  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();

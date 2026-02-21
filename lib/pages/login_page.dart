@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class LoginPage extends ConsumerStatefulWidget {
+  const LoginPage({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -110,7 +110,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: () => context.push('/register'),
+                  // onPressed: () => context.push('/register'),
+                  onPressed: () => context.go('/register'),
                   child: const Text('Don\'t have an account? Register'),
                 ),
               ],
