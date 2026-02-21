@@ -110,7 +110,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                 const SizedBox(height: 16),
                 TextButton(
-                  // onPressed: () => context.push('/register'),
                   onPressed: () => context.go('/register'),
                   child: const Text('Don\'t have an account? Register'),
                 ),
