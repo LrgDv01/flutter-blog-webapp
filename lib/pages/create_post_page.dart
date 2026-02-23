@@ -96,8 +96,15 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Create Post')),
+    return Scaffold(      
+      appBar: AppBar(
+        // Back to home button
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 30),
+          onPressed: () => context.replace('/home'),
+        ),
+          title: const Center(child: Text('Create Post')),
+        ),
       body: Form(
         key: _formKey,
         child: ListView(

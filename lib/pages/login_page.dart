@@ -36,7 +36,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           .read(authProvider.notifier)
           .signIn(_emailController.text.trim(), _passwordController.text);
       // Navigate to home on success
-      if (mounted) context.go('/');
+      if (mounted) context.go('/home');
     } catch (e) {
       // Show error message
       if (mounted) {
