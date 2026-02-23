@@ -1,4 +1,5 @@
 class Post {
+  // Unique identifier for the post
   final String id;
   final String userId;
   final String title;
@@ -7,6 +8,7 @@ class Post {
   final DateTime createdAt;
   final DateTime? updatedAt;
 
+  // Constructor to initialize all fields of the Post class
   Post({
     required this.id,
     required this.userId,
@@ -17,15 +19,18 @@ class Post {
     this.updatedAt,
   });
 
+  // Factory constructor to create a Post instance from JSON data
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
-      id: json['id'],
-      userId: json['user_id'],
-      title: json['title'],
-      content: json['content'],
-      imageUrl: json['image_url'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      id: json['id'] as String,
+      userId: json['user_id'] as String,
+      title: json['title'] as String,
+      content: json['content'] as String,
+      imageUrl: json['image_url'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: json['updated_at'] != null 
+        ? DateTime.parse(json['updated_at'] as String) 
+        : null,
     );
   }
 }

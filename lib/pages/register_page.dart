@@ -3,45 +3,59 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 
-class RegisterPage extends ConsumerStatefulWidget { 
+// ConsumerStatefulWidget to access Riverpod providers
+class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
-  
+
   @override
   ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
 class _RegisterPageState extends ConsumerState<RegisterPage> {
+  // Form key for validation
   final _formKey = GlobalKey<FormState>();
+  // Text controllers for form inputs
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _displayNameController = TextEditingController();
+  // Toggle password visibility
   bool _obscurePassword = true;
 
   @override
   void dispose() {
+    // Clean up controllers
     _emailController.dispose();
     _passwordController.dispose();
     _displayNameController.dispose();
     super.dispose();
   }
 
+  // Register user with form validation
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      await ref.read(authProvider.notifier).signUp(
+      // Call sign up method from auth provider
+      await ref
+          .read(authProvider.notifier)
+          .signUp(
             _emailController.text.trim(),
             _passwordController.text,
             _displayNameController.text.trim(),
           );
       if (mounted) {
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration successful! Please check your email.')),
+          const SnackBar(
+            content: Text('Registration successful! Please check your email.'),
+          ),
         );
+        // Navigate to login page
         context.go('/login');
       }
     } catch (e) {
       if (mounted) {
+        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Registration failed: ${e.toString()}')),
         );
@@ -51,6 +65,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch auth state for loading status
     final authState = ref.watch(authProvider);
 
     return Scaffold(
@@ -63,6 +78,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Display name field
                 TextFormField(
                   controller: _displayNameController,
                   decoration: const InputDecoration(
@@ -76,6 +92,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
                 const SizedBox(height: 16),
 
+                // Email field with email validation
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(
@@ -89,6 +106,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
                 const SizedBox(height: 16),
 
+                // Password field with visibility toggle
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -97,18 +115,22 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     prefixIcon: const Icon(Icons.lock),
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off),
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
                       onPressed: () =>
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  validator: (value) =>
-                      value == null || value.length < 6 ? 'Minimum 6 characters' : null,
+                  validator: (value) => value == null || value.length < 6
+                      ? 'Minimum 6 characters'
+                      : null,
                 ),
                 const SizedBox(height: 24),
 
+                // Register button with loading state
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -116,11 +138,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     onPressed: authState.isLoading ? null : _register,
                     child: authState.isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Create Account', style: TextStyle(fontSize: 18)),
+                        : const Text(
+                            'Create Account',
+                            style: TextStyle(fontSize: 18),
+                          ),
                   ),
                 ),
 
                 const SizedBox(height: 16),
+                // Link to login page
                 TextButton(
                   onPressed: () => context.go('/login'),
                   child: const Text('Already have an account? Login'),

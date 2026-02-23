@@ -1,51 +1,54 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
 import 'package:flutter_blog_webapp/models/post.dart';
 
 // StateNotifier to manage posts state and actions
 class PostsNotifier extends StateNotifier<List<Post>> {
   PostsNotifier() : super([]) {
-    fetchPosts();
+    fetchPosts(); // Load posts on initialization
   }
 
-  // Method to fetch posts from Supabase
+  // Fetch all posts from Supabase, ordered by creation date
   Future<void> fetchPosts() async {
     final response = await supabase
         .from('posts')
         .select()
         .order('created_at', ascending: false);
 
-    state = response.map<Post>((json) => Post.fromJson(json)).toList(); // Update state with fetched posts
+    // Convert response to List<Post> and update state
+    state = response.map<Post>((json) => Post.fromJson(json)).toList();
   }
 
-  // Method to create a new post
+  // Add a new post to the database
   Future<void> createPost({
     required String title,
     required String content,
-    required List<String> imageUrls,
+    String? imageUrl,
   }) async {
-    final user = supabase.auth.currentUser; // Ensure user is logged in before creating a post
+    // Check if user is authenticated
+    final user = supabase.auth.currentUser;
     if (user == null) return;
 
+    // Insert post with user ID
     await supabase.from('posts').insert({
       'title': title,
       'content': content,
       'user_id': user.id,
-      'images': imageUrls,
+      'image_url': imageUrl,
     });
 
-    await fetchPosts(); // refresh list
+    // Refresh posts list
+    await fetchPosts();
   }
 
-  // Additional methods for updating and deleting posts can be added here
+  // Remove a post by ID
   Future<void> deletePost(String postId) async {
     await supabase.from('posts').delete().eq('id', postId);
-    await fetchPosts();
+    await fetchPosts(); // Refresh list after deletion
   }
 }
 
-// Provider to access posts state and actions
+// Riverpod provider for posts management
 final postsProvider = StateNotifierProvider<PostsNotifier, List<Post>>(
   (ref) => PostsNotifier(),
 );

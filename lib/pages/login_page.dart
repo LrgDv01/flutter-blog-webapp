@@ -11,6 +11,7 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
+  // Form and text controllers
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -18,21 +19,26 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   void dispose() {
+    // Cleanup resources
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  // Handle login logic
   Future<void> _login() async {
+    // Validate form before proceeding
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      await ref.read(authProvider.notifier).signIn(
-            _emailController.text.trim(),
-            _passwordController.text,
-          );
+      // Sign in user via auth provider
+      await ref
+          .read(authProvider.notifier)
+          .signIn(_emailController.text.trim(), _passwordController.text);
+      // Navigate to home on success
       if (mounted) context.go('/');
     } catch (e) {
+      // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Login failed: ${e.toString()}')),
@@ -43,6 +49,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch auth state for loading
     final authState = ref.watch(authProvider);
 
     return Scaffold(
@@ -54,7 +61,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.article_outlined, size: 100, color: Colors.indigo),
+                // Header section
+                const Icon(
+                  Icons.article_outlined,
+                  size: 100,
+                  color: Colors.indigo,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Welcome Back!',
@@ -63,6 +75,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 const Text('Sign in to continue to your blog'),
                 const SizedBox(height: 32),
 
+                // Email field
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(
@@ -77,6 +90,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 ),
                 const SizedBox(height: 16),
 
+                // Password field with visibility toggle
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -84,19 +98,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock),
                     border: const OutlineInputBorder(),
+                    // Toggle visibility button
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off),
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
                       onPressed: () =>
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  validator: (value) =>
-                      value == null || value.length < 6 ? 'Password too short' : null,
+                  validator: (value) => value == null || value.length < 6
+                      ? 'Password too short'
+                      : null,
                 ),
                 const SizedBox(height: 24),
 
+                // Login button
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -108,6 +127,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
                 ),
 
+                // Register link
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => context.go('/register'),
