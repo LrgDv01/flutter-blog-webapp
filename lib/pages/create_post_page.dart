@@ -84,7 +84,8 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to create post: ${e.toString()}')),
+        );
       }
     } finally {
       // Reset loading state

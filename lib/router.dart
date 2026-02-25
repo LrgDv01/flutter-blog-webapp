@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
 import 'package:flutter_blog_webapp/pages/login_page.dart';
 import 'package:flutter_blog_webapp/pages/register_page.dart';
-import 'package:flutter_blog_webapp/pages/create_post_page.dart';
 import 'package:flutter_blog_webapp/pages/home_page.dart';
+import 'package:flutter_blog_webapp/pages/create_post_page.dart';
+import 'package:flutter_blog_webapp/pages/post_detail_page.dart';
+import 'package:flutter_blog_webapp/pages/edit_post_page.dart';
 
 // Provides a GoRouter instance with authentication-based routing
 final routerProvider = Provider<GoRouter>((ref) {
@@ -46,6 +48,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/create-post',
         builder: (context, state) => const CreatePostPage(),
       ),
+      GoRoute(
+        path: '/post/:id',
+        builder:(context, state) => PostDetailPage(postId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/edit-post/:id',
+        builder: (context, state) => EditPostPage(postId: state.pathParameters['id']!),
+      )
     ],
   );
 });

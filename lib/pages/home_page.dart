@@ -49,56 +49,110 @@ class HomePage extends ConsumerWidget {
               itemCount: posts.length,
               itemBuilder: (context, index) {
                 final post = posts[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Display post image if available
-                      if (post.imageUrl != null)
-                        CachedNetworkImage(
-                          imageUrl: post.imageUrl!,
-                          placeholder: (context, url) =>
-                              const Center(child: CircularProgressIndicator()),
-                          errorWidget: (context, url, error) =>
-                              const Icon(Icons.error),
-                          width: double.infinity,
-                          height: 200,
-                          fit: BoxFit.cover,
-                        ),
-                      // Post title, content, and author info
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Post title
-                            Text(
-                              post.title,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                return 
+                InkWell(
+                  onTap: () => context.push('/post/${post.id}'), // Navigate to post detail on tap
+                  child: Card(
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Display post image if available
+                        if (post.imageUrl != null)
+                          CachedNetworkImage(
+                            imageUrl: post.imageUrl!,
+                            placeholder: (context, url) =>
+                                const Center(child: CircularProgressIndicator()),
+                            errorWidget: (context, url, error) =>
+                                const Icon(Icons.error),
+                            width: double.infinity,
+                            height: 200,
+                            fit: BoxFit.cover,
+                          ),
+                        // Post title, content, and author info
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Post title
+                              Text(
+                                post.title,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            // Post preview (limited to 3 lines)
-                            Text(
-                              post.content,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            // Author attribution
-                            Text(
-                              'By ${authState.user?.userMetadata?['display_name'] ?? 'You'}',
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              // Post preview (limited to 3 lines)
+                              Text(
+                                post.content,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              // Author attribution
+                              Text(
+                                'By ${authState.user?.userMetadata?['display_name'] ?? 'You'}',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                );
+                );      
+                // Card(
+                //   margin: const EdgeInsets.symmetric(vertical: 8),
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       // Display post image if available
+                //       if (post.imageUrl != null)
+                //         CachedNetworkImage(
+                //           imageUrl: post.imageUrl!,
+                //           placeholder: (context, url) =>
+                //               const Center(child: CircularProgressIndicator()),
+                //           errorWidget: (context, url, error) =>
+                //               const Icon(Icons.error),
+                //           width: double.infinity,
+                //           height: 200,
+                //           fit: BoxFit.cover,
+                //         ),
+                //       // Post title, content, and author info
+                //       Padding(
+                //         padding: const EdgeInsets.all(16),
+                //         child: Column(
+                //           crossAxisAlignment: CrossAxisAlignment.start,
+                //           children: [
+                //             // Post title
+                //             Text(
+                //               post.title,
+                //               style: const TextStyle(
+                //                 fontSize: 20,
+                //                 fontWeight: FontWeight.bold,
+                //               ),
+                //             ),
+                //             const SizedBox(height: 8),
+                //             // Post preview (limited to 3 lines)
+                //             Text(
+                //               post.content,
+                //               maxLines: 3,
+                //               overflow: TextOverflow.ellipsis,
+                //             ),
+                //             const SizedBox(height: 8),
+                //             // Author attribution
+                //             Text(
+                //               'By ${authState.user?.userMetadata?['display_name'] ?? 'You'}',
+                //               style: const TextStyle(color: Colors.grey),
+                //             ),
+                //           ],
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // );
               },
             ),
     );
