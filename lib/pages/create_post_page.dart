@@ -77,7 +77,7 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post created successfully')),
         );
-        context.pop();
+        context.replace('/home'); // Navigate back to home after creation
       }
     } catch (e) {
       // Handle errors

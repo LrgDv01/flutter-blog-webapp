@@ -36,16 +36,16 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     // Define app routes
     routes: [
-      GoRoute(
-        path: '/create-post',
-        builder: (context, state) => const CreatePostPage(),
-      ),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterPage(),
       ),
       GoRoute(path: '/home', builder: (context, state) => const HomePage()),
+      GoRoute(
+        path: '/create-post',
+        builder: (context, state) => const CreatePostPage(),
+      ),
     ],
   );
 });
