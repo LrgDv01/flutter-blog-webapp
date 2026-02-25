@@ -1,4 +1,3 @@
-// Similar to CreatePostScreen but pre-filled and uses updatePost
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,9 +15,12 @@ class EditPostPage extends ConsumerStatefulWidget {
 }
 
 class _EditPostPageState extends ConsumerState<EditPostPage> {
+  // Form and text controllers
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
+
+  // Image picker utilities
   final _picker = ImagePicker();
   XFile? _selectedImage;
   bool _isLoading = false;
@@ -26,7 +28,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
   @override
   void initState() {
     super.initState();
-    // Prefill from existing post
+    // Prefill form fields with existing post data
     final post = ref
         .read(postsProvider)
         .firstWhere((p) => p.id == widget.postId);
@@ -34,6 +36,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
     _contentController.text = post.content;
   }
 
+  // Allow user to select image from gallery
   Future<void> _pickImage() async {
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
@@ -46,6 +49,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
     }
   }
 
+  // Upload new image and update post in database
   Future<void> _updatePost() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -53,6 +57,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
     String? uploadedUrl;
 
     try {
+      // Upload image to Supabase storage if selected
       if (_selectedImage != null) {
         final bytes = await _selectedImage!.readAsBytes();
         final userId = supabase.auth.currentUser!.id;
@@ -68,20 +73,21 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
             .getPublicUrl('$userId/$fileName');
       }
 
+      // Update post with new title, content, and image URL
       await ref
           .read(postsProvider.notifier)
           .updatePost(
             postId: widget.postId,
             title: _titleController.text.trim(),
             content: _contentController.text.trim(),
-            imageUrl: uploadedUrl, // Pass new image URL if updated
+            imageUrl: uploadedUrl,
           );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post updated successfully')),
         );
-        context.replace('/home'); // Navigate back to home after update
+        context.replace('/home'); // Navigate back to home
       }
     } catch (e) {
       if (mounted) {
@@ -111,6 +117,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
           key: _formKey,
           child: Column(
             children: [
+              // Title input field
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(labelText: 'Title'),
@@ -118,6 +125,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
                     value!.isEmpty ? 'Please enter a title' : null,
               ),
               const SizedBox(height: 16),
+              // Content input field
               TextFormField(
                 controller: _contentController,
                 decoration: const InputDecoration(labelText: 'Content'),
@@ -126,18 +134,21 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
                     value!.isEmpty ? 'Please enter content' : null,
               ),
               const SizedBox(height: 16),
+              // Display selected image preview
               if (_selectedImage != null)
                 Image.file(
                   File(_selectedImage!.path),
                   height: 200,
                   fit: BoxFit.cover,
                 ),
+              // Button to select new image
               TextButton.icon(
                 onPressed: _pickImage,
                 icon: const Icon(Icons.image),
                 label: const Text('Change Image'),
               ),
               const SizedBox(height: 24),
+              // Submit button
               ElevatedButton(
                 onPressed: _isLoading ? null : _updatePost,
                 child: _isLoading

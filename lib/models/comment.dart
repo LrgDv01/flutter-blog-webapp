@@ -1,4 +1,5 @@
 class Comment {
+  // Fields representing the properties of a comment
   final String id;
   final String postId;
   final String userId;
@@ -7,6 +8,7 @@ class Comment {
   final DateTime createdAt;
   final DateTime? updatedAt;
 
+  // Constructor to initialize all fields of the Comment class
   Comment({
     required this.id,
     required this.postId,
@@ -17,6 +19,7 @@ class Comment {
     this.updatedAt,
   });
 
+  // Factory constructor to create a Comment instance from JSON data
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
       id: json['id'] as String,
