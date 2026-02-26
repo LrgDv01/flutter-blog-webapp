@@ -54,27 +54,32 @@ class HomePage extends ConsumerWidget {
                 final post = posts[index];
                 // Tap to navigate to post details
                 return InkWell(
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () => context.push('/post/${post.id}'),
                   // Card container for each post
                   child: Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Post image if available (with caching and error handling)
+                        // Display post image if available
                         if (post.imageUrl != null)
-                          CachedNetworkImage(
-                            imageUrl: post.imageUrl!,
-                            placeholder: (context, url) => const Center(
-                              child: CircularProgressIndicator(),
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(12),
                             ),
-                            errorWidget: (context, url, error) =>
-                                const Icon(Icons.error),
-                            width: double.infinity,
-                            height: 200,
-                            fit: BoxFit.cover,
+                            child: CachedNetworkImage(
+                              imageUrl: post.imageUrl!,
+                              height: 180,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
                           ),
-                        // Post details section
+                        // Post title, content preview, author and date information
                         Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -89,17 +94,21 @@ class HomePage extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              // Post content preview (truncated)
+                              // Post content preview (limited to 3 lines with ellipsis)
                               Text(
                                 post.content,
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(height: 1.4),
                               ),
                               const SizedBox(height: 8),
-                              // Author name
+                              // Author name and post date
                               Text(
-                                'By ${authState.user?.userMetadata?['display_name'] ?? 'You'}',
-                                style: const TextStyle(color: Colors.grey),
+                                'By ${authState.user?.userMetadata?['display_name'] ?? 'You'} | Posted • ${post.createdAt.toString().substring(0, 10)}',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),

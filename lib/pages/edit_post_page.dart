@@ -15,10 +15,12 @@ class EditPostPage extends ConsumerStatefulWidget {
 }
 
 class _EditPostPageState extends ConsumerState<EditPostPage> {
+  // Form state and input controllers.
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _titleController;
   late TextEditingController _contentController;
 
+  // Image edit state: keep existing, replace with new, or remove.
   final _picker = ImagePicker();
   XFile? _newImageFile;
   String? _existingImageUrl;
@@ -28,6 +30,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
   @override
   void initState() {
     super.initState();
+    // Load current post values so the user edits existing data.
     final post = ref.read(postsProvider).firstWhere(
       (p) => p.id == widget.postId,
       orElse: () => throw Exception('Post not found'),
@@ -39,6 +42,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
   }
 
   Future<void> _pickNewImage() async {
+    // Pick a replacement image from gallery and cancel any remove flag.
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
@@ -57,6 +61,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
 
     setState(() => _isSaving = true);
 
+    // Default behavior: keep the existing image URL.
     String? finalImageUrl = _existingImageUrl;
 
     try {
@@ -88,6 +93,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
           );
 
       if (mounted) {
+        // Return to previous screen after successful update.
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post updated successfully')),
         );
@@ -140,6 +146,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
             const Text('Cover Image', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
 
+            // Preview priority: removed -> new local selection -> existing remote image.
             if (_removeImage || (_existingImageUrl == null && _newImageFile == null))
               const Text('No image', style: TextStyle(color: Colors.grey))
             else if (_newImageFile != null)
@@ -165,6 +172,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
 
             const SizedBox(height: 12),
 
+            // Actions for replacing or removing the current cover image.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
