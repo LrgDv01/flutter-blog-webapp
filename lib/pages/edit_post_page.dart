@@ -31,10 +31,13 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
   void initState() {
     super.initState();
     // Load current post values so the user edits existing data.
-    final post = ref.read(postsProvider).firstWhere(
-      (p) => p.id == widget.postId,
-      orElse: () => throw Exception('Post not found'),
-    );
+    final post = ref
+        .read(postsProvider)
+        .posts
+        .firstWhere(
+          (p) => p.id == widget.postId,
+          orElse: () => throw Exception('Post not found'),
+        );
 
     _titleController = TextEditingController(text: post.title);
     _contentController = TextEditingController(text: post.content);
@@ -69,11 +72,12 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
       if (_removeImage) {
         finalImageUrl = null;
       }
-      // Case 2: User picked a new image → upload it
+      // Case 2: User picked a new image -> upload it
       else if (_newImageFile != null) {
         final bytes = await _newImageFile!.readAsBytes();
         final userId = supabase.auth.currentUser!.id;
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_newImageFile!.name}';
+        final fileName =
+            '${DateTime.now().millisecondsSinceEpoch}_${_newImageFile!.name}';
 
         await supabase.storage
             .from('post_images')
@@ -83,9 +87,11 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
             .from('post_images')
             .getPublicUrl('$userId/$fileName');
       }
-      // Case 3: Keep existing image → do nothing
+      // Case 3: Keep existing image -> do nothing
 
-      await ref.read(postsProvider.notifier).updatePost(
+      await ref
+          .read(postsProvider.notifier)
+          .updatePost(
             postId: widget.postId,
             title: _titleController.text.trim(),
             content: _contentController.text.trim(),
@@ -101,9 +107,9 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update post: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update post: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -113,9 +119,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Post'),
-      ),
+      appBar: AppBar(title: const Text('Edit Post')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -139,15 +143,20 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
                 border: OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
-              validator: (v) => v!.trim().isEmpty ? 'Content is required' : null,
+              validator: (v) =>
+                  v!.trim().isEmpty ? 'Content is required' : null,
             ),
             const SizedBox(height: 24),
 
-            const Text('Cover Image', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              'Cover Image',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
 
             // Preview priority: removed -> new local selection -> existing remote image.
-            if (_removeImage || (_existingImageUrl == null && _newImageFile == null))
+            if (_removeImage ||
+                (_existingImageUrl == null && _newImageFile == null))
               const Text('No image', style: TextStyle(color: Colors.grey))
             else if (_newImageFile != null)
               ClipRRect(
@@ -181,16 +190,20 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
                   icon: const Icon(Icons.upload),
                   label: const Text('Change Image'),
                 ),
-                if ((_existingImageUrl != null || _newImageFile != null) && !_removeImage)
+                if ((_existingImageUrl != null || _newImageFile != null) &&
+                    !_removeImage)
                   OutlinedButton.icon(
                     onPressed: _isSaving
                         ? null
                         : () => setState(() {
-                              _removeImage = true;
-                              _newImageFile = null;
-                            }),
+                            _removeImage = true;
+                            _newImageFile = null;
+                          }),
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    label: const Text('Remove Image', style: TextStyle(color: Colors.red)),
+                    label: const Text(
+                      'Remove Image',
+                      style: TextStyle(color: Colors.red),
+                    ),
                   ),
               ],
             ),
@@ -199,7 +212,9 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
 
             FilledButton(
               onPressed: _isSaving ? null : _saveChanges,
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(54),
+              ),
               child: _isSaving
                   ? const SizedBox(
                       height: 24,

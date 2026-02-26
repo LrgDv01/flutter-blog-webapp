@@ -1,64 +1,136 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
 import 'package:flutter_blog_webapp/providers/posts_provider.dart';
+import 'package:flutter_blog_webapp/providers/profile_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
-// Main home page widget extending ConsumerWidget for Riverpod state management
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
+  Future<void> _refreshPosts(WidgetRef ref) async {
+    await ref.read(postsProvider.notifier).fetchPosts();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch auth and posts state from providers
     final authState = ref.watch(authProvider);
-    final posts = ref.watch(postsProvider);
+    final postsState = ref.watch(postsProvider);
+    final profiles = ref.watch(profilesProvider);
+    final posts = postsState.posts;
+    // Keep existing posts visible even when refresh fails.
+    final showInlineError = postsState.error != null && posts.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Flutter Blog',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            fontFeatures: [FontFeature.enable('smcp')],
-          ),
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         actions: [
-          // Logout button in app bar
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              // Sign out and redirect to login page
               await ref.read(authProvider.notifier).signOut();
               if (context.mounted) context.go('/login');
             },
           ),
         ],
       ),
-      // Floating action button to create new post
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.replace('/create-post'),
         child: const Icon(Icons.add),
       ),
-      // Main content area - show empty state or posts list
-      body: posts.isEmpty
-          // Empty state message when no posts exist
-          ? const Center(child: Text('No posts yet. Create one!'))
-          // Scrollable list of blog posts
-          : ListView.builder(
+      body: Builder(
+        builder: (context) {
+          // First load state.
+          if (postsState.isLoading && posts.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Full-page error when there is nothing cached to render.
+          if (postsState.error != null && posts.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Failed to load posts\n${postsState.error}',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () =>
+                          ref.read(postsProvider.notifier).fetchPosts(),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          if (posts.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: () => _refreshPosts(ref),
+              // AlwaysScrollable allows pull-to-refresh on empty lists.
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
+                  SizedBox(height: 220),
+                  Center(child: Text('No posts yet. Create one!')),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => _refreshPosts(ref),
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(8),
-              itemCount: posts.length,
+              itemCount: posts.length + (showInlineError ? 1 : 0),
               itemBuilder: (context, index) {
-                final post = posts[index];
-                // Tap to navigate to post details
+                // Inline refresh error banner above the current list.
+                if (showInlineError && index == 0) {
+                  return Card(
+                    color: Colors.red.shade50,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                      ),
+                      title: Text(
+                        'Could not refresh latest data: ${postsState.error}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  );
+                }
+
+                final actualIndex = showInlineError ? index - 1 : index;
+                final post = posts[actualIndex];
+                // Use profile lookup first, then fallback to auth metadata.
+                final authorName =
+                    profiles[post.userId]?.displayName ??
+                    authState.user?.userMetadata?['display_name'] ??
+                    'Anonymous';
+
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () => context.push('/post/${post.id}'),
-                  // Card container for each post
                   child: Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    margin: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 12,
+                    ),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -66,7 +138,6 @@ class HomePage extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Display post image if available
                         if (post.imageUrl != null)
                           ClipRRect(
                             borderRadius: const BorderRadius.vertical(
@@ -79,13 +150,11 @@ class HomePage extends ConsumerWidget {
                               fit: BoxFit.cover,
                             ),
                           ),
-                        // Post title, content preview, author and date information
                         Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Post title
                               Text(
                                 post.title,
                                 style: const TextStyle(
@@ -94,7 +163,6 @@ class HomePage extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              // Post content preview (limited to 3 lines with ellipsis)
                               Text(
                                 post.content,
                                 maxLines: 3,
@@ -102,9 +170,8 @@ class HomePage extends ConsumerWidget {
                                 style: const TextStyle(height: 1.4),
                               ),
                               const SizedBox(height: 8),
-                              // Author name and post date
                               Text(
-                                'By ${authState.user?.userMetadata?['display_name'] ?? 'You'} | Posted • ${post.createdAt.toString().substring(0, 10)}',
+                                'By $authorName | Posted ${post.createdAt.toString().substring(0, 10)}',
                                 style: const TextStyle(
                                   color: Colors.grey,
                                   fontSize: 12,
@@ -119,6 +186,9 @@ class HomePage extends ConsumerWidget {
                 );
               },
             ),
+          );
+        },
+      ),
     );
   }
 }

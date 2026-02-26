@@ -1,109 +1,208 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_blog_webapp/supabase_client.dart';
-import 'package:flutter_blog_webapp/models/post.dart';
 import 'package:flutter_blog_webapp/models/comment.dart';
+import 'package:flutter_blog_webapp/models/post.dart';
+import 'package:flutter_blog_webapp/supabase_client.dart';
 
-/// Manages the state of all blog posts
-class PostsNotifier extends StateNotifier<List<Post>> {
-  PostsNotifier() : super([]) {
+// State for the main posts feed.
+class PostsState {
+  final List<Post> posts;
+  final bool isLoading;
+  final String? error;
+
+  const PostsState({this.posts = const [], this.isLoading = false, this.error});
+
+  PostsState copyWith({
+    List<Post>? posts,
+    bool? isLoading,
+    String? error,
+    bool clearError = false,
+  }) {
+    // `clearError` lets callers reset stale errors while keeping other values.
+    return PostsState(
+      posts: posts ?? this.posts,
+      isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
+    );
+  }
+}
+
+// State for comments tied to a single post.
+class CommentsState {
+  final List<Comment> comments;
+  final bool isLoading;
+  final String? error;
+
+  const CommentsState({
+    this.comments = const [],
+    this.isLoading = false,
+    this.error,
+  });
+
+  CommentsState copyWith({
+    List<Comment>? comments,
+    bool? isLoading,
+    String? error,
+    bool clearError = false,
+  }) {
+    // Same error reset behavior as PostsState.
+    return CommentsState(
+      comments: comments ?? this.comments,
+      isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
+    );
+  }
+}
+
+class PostsNotifier extends StateNotifier<PostsState> {
+  PostsNotifier() : super(const PostsState()) {
     fetchPosts();
   }
 
-  /// Fetches all posts from the database
+  // Used by initial load and pull-to-refresh.
   Future<void> fetchPosts() async {
-    final response = await supabase
-        .from('posts')
-        .select()
-        .order('created_at', ascending: false);
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final response = await supabase
+          .from('posts')
+          .select()
+          .order('created_at', ascending: false);
 
-    state = response.map<Post>((json) => Post.fromJson(json)).toList();
+      state = state.copyWith(
+        posts: (response as List)
+            .map((json) => Post.fromJson(Map<String, dynamic>.from(json)))
+            .toList(),
+        isLoading: false,
+        clearError: true,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
   }
 
-  /// Creates a new post and refreshes the list
+  // Creates a new post and refreshes the list
   Future<void> createPost({
     required String title,
     required String content,
     String? imageUrl,
   }) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('You must be logged in to create a post.');
+      }
 
-    await supabase.from('posts').insert({
-      'title': title,
-      'content': content,
-      'user_id': user.id,
-      'image_url': imageUrl,
-    });
-    await fetchPosts();
+      await supabase.from('posts').insert({
+        'title': title,
+        'content': content,
+        'user_id': user.id,
+        'image_url': imageUrl,
+      });
+      await fetchPosts();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
   }
 
-  /// Updates an existing post and refreshes the list
   Future<void> updatePost({
     required String postId,
     required String title,
     required String content,
     String? imageUrl,
   }) async {
-    await supabase
-        .from('posts')
-        .update({'title': title, 'content': content, 'image_url': ?imageUrl}) // Handle null imageUrl properly
-        .eq('id', postId);
-    await fetchPosts();
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await supabase
+          .from('posts')
+          .update({'title': title, 'content': content, 'image_url': imageUrl})
+          .eq('id', postId);
+      await fetchPosts();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
   }
 
-  /// Deletes a post and refreshes the list
   Future<void> deletePost(String postId) async {
-    await supabase.from('posts').delete().eq('id', postId);
-    await fetchPosts();
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await supabase.from('posts').delete().eq('id', postId);
+      await fetchPosts();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
   }
 }
 
-/// Global provider for posts
-final postsProvider = StateNotifierProvider<PostsNotifier, List<Post>>(
+final postsProvider = StateNotifierProvider<PostsNotifier, PostsState>(
   (ref) => PostsNotifier(),
 );
 
-/// Manages comments for a specific post
-class CommentsNotifier extends StateNotifier<List<Comment>> {
+class CommentsNotifier extends StateNotifier<CommentsState> {
   final String postId;
-  CommentsNotifier(this.postId) : super([]) {
+  CommentsNotifier(this.postId) : super(const CommentsState()) {
     fetchComments();
   }
 
-  /// Fetches all comments for this post
+  // Reload comments whenever a comment is added/removed.
   Future<void> fetchComments() async {
-    final response = await supabase
-        .from('comments')
-        .select()
-        .eq('post_id', postId)
-        .order('created_at', ascending: true);
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final response = await supabase
+          .from('comments')
+          .select()
+          .eq('post_id', postId)
+          .order('created_at', ascending: true);
 
-    state = response.map<Comment>((json) => Comment.fromJson(json)).toList();
+      state = state.copyWith(
+        comments: (response as List)
+            .map((json) => Comment.fromJson(Map<String, dynamic>.from(json)))
+            .toList(),
+        isLoading: false,
+        clearError: true,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
   }
 
-  /// Adds a new comment to the post
   Future<void> addComment({required String content, String? imageUrl}) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        throw Exception('You must be logged in to comment.');
+      }
 
-    await supabase.from('comments').insert({
-      'post_id': postId,
-      'user_id': user.id,
-      'content': content,
-      'image_url': imageUrl,
-    });
-    await fetchComments();
+      await supabase.from('comments').insert({
+        'post_id': postId,
+        'user_id': user.id,
+        'content': content,
+        'image_url': imageUrl,
+      });
+      await fetchComments();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
   }
 
-  /// Deletes a comment and refreshes the list
   Future<void> deleteComment(String commentId) async {
-    await supabase.from('comments').delete().eq('id', commentId);
-    await fetchComments();
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await supabase.from('comments').delete().eq('id', commentId);
+      await fetchComments();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
   }
 }
 
-/// Family provider for comments - creates separate notifier per post
 final commentsProviderFamily =
-    StateNotifierProvider.family<CommentsNotifier, List<Comment>, String>(
+    StateNotifierProvider.family<CommentsNotifier, CommentsState, String>(
+      // One comments notifier instance per post id.
       (ref, postId) => CommentsNotifier(postId),
     );
