@@ -12,7 +12,9 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
     // Load profile fields used by post/comment author display.
     final data = await supabase
         .from('profiles')
-        .select('id, user_id, display_name, avatar_url, created_at, updated_at');
+        .select(
+          'id, user_id, display_name, avatar_url, created_at, updated_at',
+        );
 
     // Key profiles by user id for quick lookups across the app.
     final map = <String, Profile>{};
@@ -28,6 +30,24 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
   // Keep UI labels readable while a profile is missing.
   String getDisplayName(String userId) =>
       state[userId]?.displayName ?? 'Anonymous';
+
+  // Allow profile updates to be made from the UI, but keep the cache in sync by re-fetching all profiles after an update.
+  Future<void> updateProfile({
+    required String userId,
+    String? displayName,
+    String? avatarUrl,
+  }) async {
+    await supabase
+      .from('profiles')
+      .update({
+        'display_name': ?displayName,
+        'avatar_url': ?avatarUrl,
+        'updated_at': DateTime.now().toIso8601String()})
+      .eq('user_id', userId);
+          
+    // Refresh the entire cache to reflect the updated profile across the app.
+    await _fetchAllProfiles();
+  }
 }
 
 // Shared profile cache for resolving author details in the UI.
