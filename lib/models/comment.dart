@@ -5,10 +5,10 @@ class Comment {
   final String userId;
   final String content;
   final String? imageUrl;
-  final String? authorName; 
+  final String? authorName;
+  final bool isAnonymous;
   final DateTime createdAt;
   final DateTime? updatedAt;
-  
 
   // Constructor to initialize all fields of the Comment class
   Comment({
@@ -18,6 +18,7 @@ class Comment {
     required this.content,
     this.imageUrl,
     this.authorName,
+    this.isAnonymous = false,
     required this.createdAt,
     this.updatedAt,
   });
@@ -31,10 +32,11 @@ class Comment {
       content: json['content'] as String,
       imageUrl: json['image_url'] as String?,
       authorName: json['author_name'] as String?,
+      isAnonymous: json['is_anonymous'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: json['updated_at'] != null 
-        ? DateTime.parse(json['updated_at'] as String) 
-        : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : null,
     );
   }
 }

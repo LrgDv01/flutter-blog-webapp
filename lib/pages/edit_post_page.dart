@@ -25,6 +25,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
   XFile? _newImageFile;
   String? _existingImageUrl;
   bool _removeImage = false;
+  bool _postAsAnonymous = false;
   bool _isSaving = false;
 
   @override
@@ -42,6 +43,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
     _titleController = TextEditingController(text: post.title);
     _contentController = TextEditingController(text: post.content);
     _existingImageUrl = post.imageUrl;
+    _postAsAnonymous = post.isAnonymous;
   }
 
   Future<void> _pickNewImage() async {
@@ -87,8 +89,8 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
             .from('post_images')
             .getPublicUrl('$userId/$fileName');
       }
-      // Case 3: Keep existing image -> do nothing
 
+      // Case 3: Keep existing image -> do nothing
       await ref
           .read(postsProvider.notifier)
           .updatePost(
@@ -96,6 +98,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
             title: _titleController.text.trim(),
             content: _contentController.text.trim(),
             imageUrl: finalImageUrl,
+            isAnonymous: _postAsAnonymous,
           );
 
       if (mounted) {
@@ -208,8 +211,22 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
               ],
             ),
 
+            const SizedBox(height: 12),
+
+            // Anonymous posting option
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Post anonymously'),
+              subtitle: const Text('Your name will appear as Anonymous'),
+              value: _postAsAnonymous,
+              onChanged: _isSaving
+                  ? null
+                  : (value) => setState(() => _postAsAnonymous = value),
+            ),
+
             const SizedBox(height: 32),
 
+            // Save changes button with loading indicator
             FilledButton(
               onPressed: _isSaving ? null : _saveChanges,
               style: FilledButton.styleFrom(
@@ -229,6 +246,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
     );
   }
 
+  // Clean up controllers when the widget is disposed
   @override
   void dispose() {
     _titleController.dispose();

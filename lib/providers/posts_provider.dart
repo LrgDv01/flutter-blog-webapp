@@ -55,6 +55,7 @@ class CommentsState {
 
 class PostsNotifier extends StateNotifier<PostsState> {
   PostsNotifier() : super(const PostsState()) {
+    // Warm the feed as soon as the provider is first created.
     fetchPosts();
   }
 
@@ -67,6 +68,8 @@ class PostsNotifier extends StateNotifier<PostsState> {
           .select()
           .order('created_at', ascending: false);
 
+      // print('Post ITO : $response');
+      
       state = state.copyWith(
         posts: (response as List)
             .map((json) => Post.fromJson(Map<String, dynamic>.from(json)))
@@ -84,6 +87,7 @@ class PostsNotifier extends StateNotifier<PostsState> {
     required String title,
     required String content,
     String? imageUrl,
+    bool isAnonymous = false,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -97,6 +101,7 @@ class PostsNotifier extends StateNotifier<PostsState> {
         'content': content,
         'user_id': user.id,
         'image_url': imageUrl,
+        'is_anonymous': isAnonymous,
       });
       await fetchPosts();
     } catch (e) {
@@ -110,13 +115,21 @@ class PostsNotifier extends StateNotifier<PostsState> {
     required String title,
     required String content,
     String? imageUrl,
+    bool? isAnonymous,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      await supabase
-          .from('posts')
-          .update({'title': title, 'content': content, 'image_url': imageUrl})
-          .eq('id', postId);
+      final updateData = <String, dynamic>{
+        'title': title,
+        'content': content,
+        'image_url': imageUrl,
+      };
+      // Skip anonymous flag update when caller does not send a new value.
+      if (isAnonymous != null) {
+        updateData['is_anonymous'] = isAnonymous;
+      }
+
+      await supabase.from('posts').update(updateData).eq('id', postId);
       await fetchPosts();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -136,6 +149,7 @@ class PostsNotifier extends StateNotifier<PostsState> {
   }
 }
 
+// Global feed provider used by home/detail screens.
 final postsProvider = StateNotifierProvider<PostsNotifier, PostsState>(
   (ref) => PostsNotifier(),
 );
@@ -143,6 +157,7 @@ final postsProvider = StateNotifierProvider<PostsNotifier, PostsState>(
 class CommentsNotifier extends StateNotifier<CommentsState> {
   final String postId;
   CommentsNotifier(this.postId) : super(const CommentsState()) {
+    // Load comments for this post instance immediately.
     fetchComments();
   }
 
@@ -168,7 +183,11 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
     }
   }
 
-  Future<void> addComment({required String content, String? imageUrl}) async {
+  Future<void> addComment({
+    required String content,
+    String? imageUrl,
+    bool isAnonymous = false,
+  }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final user = supabase.auth.currentUser;
@@ -181,6 +200,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
         'user_id': user.id,
         'content': content,
         'image_url': imageUrl,
+        'is_anonymous': isAnonymous,
       });
       await fetchComments();
     } catch (e) {
@@ -201,6 +221,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
   }
 }
 
+// Family creates one comments stream/state per post id.
 final commentsProviderFamily =
     StateNotifierProvider.family<CommentsNotifier, CommentsState, String>(
       // One comments notifier instance per post id.

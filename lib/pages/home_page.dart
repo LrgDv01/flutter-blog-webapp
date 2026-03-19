@@ -15,6 +15,7 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch providers here so this page redraws on auth/feed/profile updates.
     final authState = ref.watch(authProvider);
     final postsState = ref.watch(postsProvider);
     final profiles = ref.watch(profilesProvider);
@@ -115,14 +116,18 @@ class HomePage extends ConsumerWidget {
                   );
                 }
 
+                // Shift by one when the inline error banner takes the first row.
                 final actualIndex = showInlineError ? index - 1 : index;
                 final post = posts[actualIndex];
-                // Use profile lookup first, then fallback to auth metadata.
-                final authorName =
-                    profiles[post.userId]?.displayName ??
-                    authState.user?.userMetadata?['display_name'] ??
-                    'Anonymous';
-
+                // Current user's posts are labeled as "You" for quick scanning.
+                final isMyPost = post.userId == authState.user?.id;
+                // For non-anonymous posts, resolve the author's display name from the profiles provider.
+                final resolvedDisplayName = profiles[post.userId]?.displayName ?? 'Unknown User';
+                    // print('Resolved display name for user ${profiles[post.userId]?.displayName} : $resolvedDisplayName');
+                final authorName = isMyPost
+                    ? 'You'
+                    : (post.isAnonymous ? 'Anonymous' : resolvedDisplayName);
+            
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () => context.push('/post/${post.id}'),
@@ -163,6 +168,7 @@ class HomePage extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
+                              // Show a short preview instead of the full article text.
                               Text(
                                 post.content,
                                 maxLines: 3,
@@ -170,8 +176,11 @@ class HomePage extends ConsumerWidget {
                                 style: const TextStyle(height: 1.4),
                               ),
                               const SizedBox(height: 8),
+                              // Metadata line keeps author/date compact in list cards.
                               Text(
-                                'By $authorName | Posted ${post.createdAt.toString().substring(0, 10)}',
+                                authorName == 'You'
+                                    ? 'You | Posted ${post.createdAt.toString().substring(0, 10)}'
+                                    : 'By $authorName | Posted ${post.createdAt.toString().substring(0, 10)}',
                                 style: const TextStyle(
                                   color: Colors.grey,
                                   fontSize: 12,

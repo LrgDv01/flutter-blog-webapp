@@ -5,6 +5,7 @@ class Post {
   final String title;
   final String content;
   final String? imageUrl;
+  final bool isAnonymous;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -15,6 +16,7 @@ class Post {
     required this.title,
     required this.content,
     this.imageUrl,
+    this.isAnonymous = false,
     required this.createdAt,
     this.updatedAt,
   });
@@ -27,8 +29,9 @@ class Post {
       title: json['title'] as String,
       content: json['content'] as String,
       imageUrl: json['image_url'] as String?,
+      isAnonymous: json['is_anonymous'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: json['updated_at'] != null 
+      updatedAt: json['updated_at'] != null
         ? DateTime.parse(json['updated_at'] as String) 
         : null,
     );

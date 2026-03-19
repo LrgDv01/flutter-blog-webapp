@@ -22,6 +22,7 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
   // Image and loading state
   XFile? _selectedImage;
   bool _isUploading = false;
+  bool _postAsAnonymous = false;
 
   // Pick image from gallery
   Future<void> _pickImage() async {
@@ -70,6 +71,7 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
             title: _titleController.text.trim(),
             content: _contentController.text.trim(),
             imageUrl: uploadedUrl,
+            isAnonymous: _postAsAnonymous,
           );
 
       // Show success and navigate back
@@ -82,9 +84,8 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
     } catch (e) {
       // Handle errors
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to create post: ${e.toString()}')),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create post: ${e.toString()}')),
         );
       }
     } finally {
@@ -97,15 +98,15 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(      
+    return Scaffold(
       appBar: AppBar(
         // Back to home button
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, size: 30),
           onPressed: () => context.replace('/home'),
         ),
-          title: const Center(child: Text('Create Post')),
-        ),
+        title: const Center(child: Text('Create Post')),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -160,6 +161,19 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
               ),
             ],
 
+            const SizedBox(height: 12),
+
+            // Anonymous posting option
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Post anonymously'),
+              subtitle: const Text('Your name will appear as Anonymous'),
+              value: _postAsAnonymous,
+              onChanged: _isUploading
+                  ? null
+                  : (value) => setState(() => _postAsAnonymous = value),
+            ),
+
             const SizedBox(height: 32),
 
             // Publish button with loading indicator
@@ -182,6 +196,7 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
     );
   }
 
+  // Clean up controllers when the widget is disposed
   @override
   void dispose() {
     _titleController.dispose();

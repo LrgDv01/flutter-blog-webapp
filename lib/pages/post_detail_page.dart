@@ -22,6 +22,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   final _picker = ImagePicker();
   XFile? _selectedCommentImage;
   bool _isSubmittingComment = false;
+  // Controls whether the next comment hides the user's name.
+  bool _commentAsAnonymous = false;
 
   // Finds the current post from the feed state if it is already loaded.
   Post? _findPost(List<Post> posts) {
@@ -46,6 +48,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       maxWidth: 1200,
     );
 
+    // Ignore if widget is gone or user canceled picker.
     if (!mounted || image == null) return;
     setState(() => _selectedCommentImage = image);
   }
@@ -81,9 +84,14 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
       await ref
           .read(commentsProviderFamily(widget.postId).notifier)
-          .addComment(content: content, imageUrl: uploadedUrl);
+          .addComment(
+            content: content,
+            imageUrl: uploadedUrl,
+            isAnonymous: _commentAsAnonymous,
+          );
 
       if (!mounted) return;
+      // Reset input state after a successful submit.
       _commentController.clear();
       setState(() => _selectedCommentImage = null);
     } catch (e) {
@@ -171,6 +179,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final profiles = ref.watch(profilesProvider);
     final post = _findPost(postState.posts);
     final currentUserId = supabase.auth.currentUser?.id;
+    // Only the author can edit/delete the current post.
     final isOwner = post?.userId == currentUserId;
     final comments = commentsState.comments;
 
@@ -218,6 +227,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
             );
           }
 
+          // Handle deleted/missing post IDs with a refreshable empty state.
           if (post == null) {
             return RefreshIndicator(
               onRefresh: _refreshData,
@@ -330,11 +340,17 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   const Text('No comments yet. Be the first to comment.')
                 else
                   ...comments.map((comment) {
-                    // Prefer profile display name, then DB fallback field.
-                    final displayName =
+                    final isMyComment = comment.userId == currentUserId;
+                    // Fall back to stored author name when profile cache misses.
+                    final resolvedDisplayName =
                         profiles[comment.userId]?.displayName ??
                         comment.authorName ??
-                        'Anonymous';
+                        'Unknown User';
+                    final displayName = isMyComment
+                        ? 'You'
+                        : (comment.isAnonymous
+                              ? 'Anonymous'
+                              : resolvedDisplayName);
                     // Only the comment owner can remove their comment.
                     final canDelete = comment.userId == currentUserId;
 
@@ -413,6 +429,15 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     labelText: 'Write a comment...',
                     border: OutlineInputBorder(),
                   ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Comment anonymously'),
+                  subtitle: const Text('Your name will appear as Anonymous'),
+                  value: _commentAsAnonymous,
+                  onChanged: _isSubmittingComment
+                      ? null
+                      : (value) => setState(() => _commentAsAnonymous = value),
                 ),
                 const SizedBox(height: 10),
                 Row(
