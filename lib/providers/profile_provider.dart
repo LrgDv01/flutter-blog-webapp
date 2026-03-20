@@ -19,7 +19,7 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
     // Key profiles by user id for quick lookups across the app.
     final map = <String, Profile>{};
     for (final row in data) {
-      final profile = Profile.fromJson(row);
+      final profile = Profile.fromJson(Map<String, dynamic>.from(row));
       map[profile.userId] = profile;
     }
     state = map;
@@ -37,14 +37,34 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
     String? displayName,
     String? avatarUrl,
   }) async {
-    await supabase
-      .from('profiles')
-      .update({
+    final timestamp = DateTime.now().toIso8601String();
+    final existingProfile = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (existingProfile == null) {
+      await supabase.from('profiles').insert({
+        'user_id': userId,
         'display_name': ?displayName,
         'avatar_url': ?avatarUrl,
-        'updated_at': DateTime.now().toIso8601String()})
-      .eq('user_id', userId);
-          
+        'updated_at': timestamp,
+      });
+    } else {
+      final updateData = <String, dynamic>{'updated_at': timestamp};
+
+      if (displayName != null) {
+        updateData['display_name'] = displayName;
+      }
+
+      if (avatarUrl != null) {
+        updateData['avatar_url'] = avatarUrl;
+      }
+
+      await supabase.from('profiles').update(updateData).eq('user_id', userId);
+    }
+
     // Refresh the entire cache to reflect the updated profile across the app.
     await _fetchAllProfiles();
   }
