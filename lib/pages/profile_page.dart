@@ -6,14 +6,14 @@ import 'package:flutter_blog_webapp/providers/profile_provider.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
 import 'package:go_router/go_router.dart';
 
-class ProfileScreen extends ConsumerStatefulWidget {
-  const ProfileScreen({super.key});
+class ProfilePage extends ConsumerStatefulWidget {
+  const ProfilePage({super.key});
 
   @override
-  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _displayNameController = TextEditingController();
   final _picker = ImagePicker();
   XFile? _newAvatar;

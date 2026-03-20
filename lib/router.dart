@@ -7,6 +7,7 @@ import 'package:flutter_blog_webapp/pages/home_page.dart';
 import 'package:flutter_blog_webapp/pages/create_post_page.dart';
 import 'package:flutter_blog_webapp/pages/post_detail_page.dart';
 import 'package:flutter_blog_webapp/pages/edit_post_page.dart';
+import 'package:flutter_blog_webapp/pages/profile_page.dart';
 
 // Provides a GoRouter instance with authentication-based routing
 final routerProvider = Provider<GoRouter>((ref) {
@@ -55,6 +56,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/edit-post/:id',
         builder: (context, state) => EditPostPage(postId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfilePage(),
       )
     ],
   );

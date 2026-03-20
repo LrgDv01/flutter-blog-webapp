@@ -19,6 +19,10 @@ class HomePage extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final postsState = ref.watch(postsProvider);
     final profiles = ref.watch(profilesProvider);
+    final currentUserId = authState.user?.id;
+    final currentProfile = currentUserId == null
+        ? null
+        : profiles[currentUserId];
     final posts = postsState.posts;
     // Keep existing posts visible even when refresh fails.
     final showInlineError = postsState.error != null && posts.isNotEmpty;
@@ -30,6 +34,17 @@ class HomePage extends ConsumerWidget {
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: CircleAvatar(
+              backgroundImage: currentProfile?.avatarUrl != null
+                  ? CachedNetworkImageProvider(currentProfile!.avatarUrl!)
+                  : null,
+              child: currentProfile?.avatarUrl == null
+                  ? const Icon(Icons.person)
+                  : null,
+            ),
+            onPressed: () => context.push('/profile'),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -122,12 +137,12 @@ class HomePage extends ConsumerWidget {
                 // Current user's posts are labeled as "You" for quick scanning.
                 final isMyPost = post.userId == authState.user?.id;
                 // For non-anonymous posts, resolve the author's display name from the profiles provider.
-                final resolvedDisplayName = profiles[post.userId]?.displayName ?? 'Unknown User';
-                    // print('Resolved display name for user ${profiles[post.userId]?.displayName} : $resolvedDisplayName');
+                final resolvedDisplayName =
+                    profiles[post.userId]?.displayName ?? 'Unknown User';
                 final authorName = isMyPost
                     ? 'You'
                     : (post.isAnonymous ? 'Anonymous' : resolvedDisplayName);
-            
+
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () => context.push('/post/${post.id}'),
