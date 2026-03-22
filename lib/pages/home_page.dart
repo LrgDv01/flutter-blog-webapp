@@ -140,7 +140,7 @@ class HomePage extends ConsumerWidget {
                 final resolvedDisplayName =
                     profiles[post.userId]?.displayName ?? 'Unknown User';
                 final authorName = isMyPost
-                    ? 'You'
+                    ? (post.isAnonymous ? 'You (Anonymous)' : 'You')
                     : (post.isAnonymous ? 'Anonymous' : resolvedDisplayName);
 
                 return InkWell(
@@ -193,8 +193,9 @@ class HomePage extends ConsumerWidget {
                               const SizedBox(height: 8),
                               // Metadata line keeps author/date compact in list cards.
                               Text(
-                                authorName == 'You'
-                                    ? 'You | Posted ${post.createdAt.toString().substring(0, 10)}'
+                                authorName == 'You' ||
+                                        authorName == 'You (Anonymous)'
+                                    ? '$authorName | Posted ${post.createdAt.toString().substring(0, 10)}'
                                     : 'By $authorName | Posted ${post.createdAt.toString().substring(0, 10)}',
                                 style: const TextStyle(
                                   color: Colors.grey,
