@@ -106,7 +106,7 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post updated successfully')),
         );
-        context.pop();
+        context.go('/post/${widget.postId}');
       }
     } catch (e) {
       if (mounted) {
@@ -122,7 +122,13 @@ class _EditPostPageState extends ConsumerState<EditPostPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Post')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/post/${widget.postId}'),
+        ),
+        title: const Center(child: Text('Edit Post')),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(

@@ -36,6 +36,7 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
     required String userId,
     String? displayName,
     String? avatarUrl,
+    bool clearAvatar = false,
   }) async {
     final timestamp = DateTime.now().toIso8601String();
     final existingProfile = await supabase
@@ -45,12 +46,19 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
         .maybeSingle();
 
     if (existingProfile == null) {
-      await supabase.from('profiles').insert({
+      final insertData = <String, dynamic>{
         'user_id': userId,
         'display_name': ?displayName,
-        'avatar_url': ?avatarUrl,
         'updated_at': timestamp,
-      });
+      };
+
+      if (clearAvatar) {
+        insertData['avatar_url'] = null;
+      } else if (avatarUrl != null) {
+        insertData['avatar_url'] = avatarUrl;
+      }
+
+      await supabase.from('profiles').insert(insertData);
     } else {
       final updateData = <String, dynamic>{'updated_at': timestamp};
 
@@ -58,7 +66,9 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
         updateData['display_name'] = displayName;
       }
 
-      if (avatarUrl != null) {
+      if (clearAvatar) {
+        updateData['avatar_url'] = null;
+      } else if (avatarUrl != null) {
         updateData['avatar_url'] = avatarUrl;
       }
 

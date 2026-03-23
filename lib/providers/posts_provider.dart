@@ -69,7 +69,7 @@ class PostsNotifier extends StateNotifier<PostsState> {
           .order('created_at', ascending: false);
 
       // print('Post ITO : $response');
-      
+
       state = state.copyWith(
         posts: (response as List)
             .map((json) => Post.fromJson(Map<String, dynamic>.from(json)))
@@ -169,7 +169,8 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
           .from('comments')
           .select()
           .eq('post_id', postId)
-          .order('created_at', ascending: true);
+          // Keep newest comments near the composer at the top of the page.
+          .order('created_at', ascending: false);
 
       state = state.copyWith(
         comments: (response as List)
@@ -213,6 +214,26 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       await supabase.from('comments').delete().eq('id', commentId);
+      await fetchComments();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  Future<void> updateComment({
+    required String commentId,
+    required String content,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await supabase
+          .from('comments')
+          .update({
+            'content': content,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', commentId);
       await fetchComments();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

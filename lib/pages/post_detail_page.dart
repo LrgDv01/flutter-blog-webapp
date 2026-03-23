@@ -1,4 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_blog_webapp/models/comment.dart';
+import 'package:flutter_blog_webapp/models/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blog_webapp/models/post.dart';
 import 'package:flutter_blog_webapp/providers/posts_provider.dart';
@@ -24,6 +26,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   bool _isSubmittingComment = false;
   // Controls whether the next comment hides the user's name.
   bool _commentAsAnonymous = false;
+
+  void _handleBackNavigation() => context.go('/home');
 
   // Finds the current post from the feed state if it is already loaded.
   Post? _findPost(List<Post> posts) {
@@ -129,7 +133,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     try {
       await ref.read(postsProvider.notifier).deletePost(widget.postId);
       if (!mounted) return;
-      context.pop();
+      _handleBackNavigation();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -172,6 +176,96 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
+  Future<void> _showEditCommentDialog(Comment comment) async {
+    final controller = TextEditingController(text: comment.content);
+    var isSaving = false;
+    final messenger = ScaffoldMessenger.of(context);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Edit comment'),
+          content: TextField(
+            controller: controller,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'Comment',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      final content = controller.text.trim();
+                      if (content.isEmpty) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Comment cannot be empty'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isSaving = true);
+                      try {
+                        await ref
+                            .read(
+                              commentsProviderFamily(widget.postId).notifier,
+                            )
+                            .updateComment(
+                              commentId: comment.id,
+                              content: content,
+                            );
+
+                        if (!mounted || !dialogContext.mounted) return;
+                        Navigator.of(dialogContext).pop();
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Comment updated successfully'),
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted || !dialogContext.mounted) return;
+                        setDialogState(() => isSaving = false);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to update comment: $e'),
+                          ),
+                        );
+                      }
+                    },
+              child: isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    controller.dispose();
+  }
+
+  ImageProvider<Object>? _buildCommentAvatar(Profile? profile, Comment comment) {
+    final avatarUrl = profile?.avatarUrl?.trim();
+    if (comment.isAnonymous || avatarUrl == null || avatarUrl.isEmpty) {
+      return null;
+    }
+
+    return CachedNetworkImageProvider(avatarUrl);
+  }
+
   @override
   Widget build(BuildContext context) {
     final postState = ref.watch(postsProvider);
@@ -185,12 +279,16 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _handleBackNavigation,
+        ),
         title: const Text('Post Detail'),
         actions: [
           if (post != null && isOwner)
             IconButton(
               icon: const Icon(Icons.edit),
-              onPressed: () => context.push('/edit-post/${widget.postId}'),
+              onPressed: () => context.go('/edit-post/${widget.postId}'),
             ),
           if (post != null && isOwner)
             IconButton(
@@ -276,6 +374,74 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   post.content,
                   style: const TextStyle(fontSize: 16, height: 1.6),
                 ),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _commentController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Write a comment...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Comment anonymously'),
+                  subtitle: const Text('Your name will appear as Anonymous'),
+                  value: _commentAsAnonymous,
+                  onChanged: _isSubmittingComment
+                      ? null
+                      : (value) => setState(() => _commentAsAnonymous = value),
+                ),
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _isSubmittingComment
+                          ? null
+                          : _pickCommentImage,
+                      icon: const Icon(Icons.image),
+                      label: Text(
+                        _selectedCommentImage == null
+                            ? 'Add image'
+                            : 'Change image',
+                      ),
+                    ),
+                    if (_selectedCommentImage != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Remove selected image',
+                        onPressed: _isSubmittingComment
+                            ? null
+                            : () =>
+                                  setState(() => _selectedCommentImage = null),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: _isSubmittingComment ? null : _addComment,
+                      child: _isSubmittingComment
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text('Post Comment'),
+                    ),
+                  ],
+                ),
+                if (_selectedCommentImage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        _selectedCommentImage!.path,
+                        height: 100,
+                      ),
+                    ),
+                  ),
                 const Divider(height: 40),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -340,18 +506,24 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   const Text('No comments yet. Be the first to comment.')
                 else
                   ...comments.map((comment) {
+                    final profile = profiles[comment.userId];
                     final isMyComment = comment.userId == currentUserId;
+                    final profileDisplayName = profile?.displayName?.trim();
                     // Fall back to stored author name when profile cache misses.
                     final resolvedDisplayName =
-                        profiles[comment.userId]?.displayName ??
+                        (profileDisplayName?.isNotEmpty == true
+                            ? profileDisplayName!
+                            : null) ??
                         comment.authorName ??
                         'Unknown User';
                     final displayName = isMyComment
-                        ? 'You'
+                        ? (comment.isAnonymous ? 'You (Anonymous)' : 'You')
                         : (comment.isAnonymous
                               ? 'Anonymous'
                               : resolvedDisplayName);
-                    // Only the comment owner can remove their comment.
+                    final avatarImage = _buildCommentAvatar(profile, comment);
+                    // Only the comment owner can edit/remove their comment.
+                    final canEdit = comment.userId == currentUserId;
                     final canDelete = comment.userId == currentUserId;
 
                     return Card(
@@ -364,7 +536,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const CircleAvatar(child: Icon(Icons.person)),
+                                CircleAvatar(
+                                  radius: 22,
+                                  backgroundImage: avatarImage,
+                                  child: avatarImage == null
+                                      ? const Icon(Icons.person)
+                                      : null,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
@@ -390,6 +568,13 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                     ],
                                   ),
                                 ),
+                                if (canEdit)
+                                  IconButton(
+                                    tooltip: 'Edit comment',
+                                    onPressed: () =>
+                                        _showEditCommentDialog(comment),
+                                    icon: const Icon(Icons.edit_outlined),
+                                  ),
                                 if (canDelete)
                                   IconButton(
                                     tooltip: 'Delete comment',
@@ -421,75 +606,6 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                       ),
                     );
                   }),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _commentController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Write a comment...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Comment anonymously'),
-                  subtitle: const Text('Your name will appear as Anonymous'),
-                  value: _commentAsAnonymous,
-                  onChanged: _isSubmittingComment
-                      ? null
-                      : (value) => setState(() => _commentAsAnonymous = value),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _isSubmittingComment
-                          ? null
-                          : _pickCommentImage,
-                      icon: const Icon(Icons.image),
-                      label: Text(
-                        _selectedCommentImage == null
-                            ? 'Add image'
-                            : 'Change image',
-                      ),
-                    ),
-                    if (_selectedCommentImage != null) ...[
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: 'Remove selected image',
-                        onPressed: _isSubmittingComment
-                            ? null
-                            : () =>
-                                  setState(() => _selectedCommentImage = null),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
-                    const Spacer(),
-                    FilledButton(
-                      onPressed: _isSubmittingComment ? null : _addComment,
-                      child: _isSubmittingComment
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : const Text('Post Comment'),
-                    ),
-                  ],
-                ),
-                if (_selectedCommentImage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        _selectedCommentImage!.path,
-                        height: 100,
-                      ),
-                    ),
-                  ),
               ],
             ),
           );

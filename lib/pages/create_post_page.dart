@@ -24,6 +24,8 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
   bool _isUploading = false;
   bool _postAsAnonymous = false;
 
+  void _handleBackNavigation() => context.go('/home');
+
   // Pick image from gallery
   Future<void> _pickImage() async {
     final image = await _picker.pickImage(
@@ -79,7 +81,7 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post created successfully')),
         );
-        context.replace('/home'); // Navigate back to home after creation
+        context.go('/home');
       }
     } catch (e) {
       // Handle errors
@@ -100,10 +102,10 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // Back to home button
+        // Return to previous page when possible, otherwise fall back to home.
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, size: 30),
-          onPressed: () => context.replace('/home'),
+          onPressed: _handleBackNavigation,
         ),
         title: const Center(child: Text('Create Post')),
       ),

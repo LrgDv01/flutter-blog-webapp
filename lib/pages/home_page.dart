@@ -23,6 +23,12 @@ class HomePage extends ConsumerWidget {
     final currentProfile = currentUserId == null
         ? null
         : profiles[currentUserId];
+    final metadataDisplayName =
+        authState.user?.userMetadata?['display_name'] as String?;
+    final currentDisplayName =
+        currentProfile?.displayName?.trim().isNotEmpty == true
+        ? currentProfile!.displayName!
+        : (metadataDisplayName ?? 'My Profile');
     final posts = postsState.posts;
     // Keep existing posts visible even when refresh fails.
     final showInlineError = postsState.error != null && posts.isNotEmpty;
@@ -34,6 +40,17 @@ class HomePage extends ConsumerWidget {
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         actions: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 140),
+              child: Text(
+                currentDisplayName,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: CircleAvatar(
               backgroundImage: currentProfile?.avatarUrl != null
@@ -43,7 +60,7 @@ class HomePage extends ConsumerWidget {
                   ? const Icon(Icons.person)
                   : null,
             ),
-            onPressed: () => context.push('/profile'),
+            onPressed: () => context.go('/profile'),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -55,7 +72,7 @@ class HomePage extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.replace('/create-post'),
+        onPressed: () => context.go('/create-post'),
         child: const Icon(Icons.add),
       ),
       body: Builder(
@@ -145,7 +162,7 @@ class HomePage extends ConsumerWidget {
 
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: () => context.push('/post/${post.id}'),
+                  onTap: () => context.go('/post/${post.id}'),
                   child: Card(
                     margin: const EdgeInsets.symmetric(
                       vertical: 8,

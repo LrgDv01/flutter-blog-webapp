@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_blog_webapp/models/profile.dart';
 import 'package:flutter_blog_webapp/providers/profile_provider.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
 import 'package:go_router/go_router.dart';
@@ -16,35 +19,100 @@ class ProfilePage extends ConsumerStatefulWidget {
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _displayNameController = TextEditingController();
   final _picker = ImagePicker();
-  XFile? _newAvatar;
+  Uint8List? _newAvatarBytes;
+  String? _newAvatarName;
   bool _isSaving = false;
+  bool _isEditing = false;
   bool _hasSeededDisplayName = false;
+  bool _removeCurrentAvatar = false;
+
+  void _handleBackNavigation() => context.go('/home');
+
+  void _beginEditing(Profile? profile) {
+    setState(() {
+      _isEditing = true;
+      _newAvatarBytes = null;
+      _newAvatarName = null;
+      _removeCurrentAvatar = false;
+      _displayNameController.text = profile?.displayName ?? '';
+    });
+  }
+
+  void _cancelEditing(Profile? profile) {
+    setState(() {
+      _isEditing = false;
+      _newAvatarBytes = null;
+      _newAvatarName = null;
+      _removeCurrentAvatar = false;
+      _displayNameController.text = profile?.displayName ?? '';
+    });
+  }
 
   Future<void> _pickAvatar() async {
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
+      maxWidth: 1200,
     );
-    if (image != null) setState(() => _newAvatar = image);
+
+    if (!mounted || image == null) return;
+    final bytes = await image.readAsBytes();
+    if (!mounted) return;
+
+    setState(() {
+      _newAvatarBytes = bytes;
+      _newAvatarName = image.name;
+      _removeCurrentAvatar = false;
+    });
   }
 
-  Future<void> _saveProfile() async {
-    setState(() => _isSaving = true);
+  void _removeAvatar() {
+    setState(() {
+      _newAvatarBytes = null;
+      _newAvatarName = null;
+      _removeCurrentAvatar = true;
+    });
+  }
 
+  ImageProvider<Object>? _buildAvatarImage(Profile? profile) {
+    if (_removeCurrentAvatar) {
+      return null;
+    }
+
+    if (_newAvatarBytes != null) {
+      return MemoryImage(_newAvatarBytes!);
+    }
+
+    if (profile?.avatarUrl != null) {
+      return CachedNetworkImageProvider(profile!.avatarUrl!);
+    }
+
+    return null;
+  }
+
+  Future<void> _saveProfile(Profile? profile) async {
+    final displayName = _displayNameController.text.trim();
+    if (displayName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Display name cannot be empty')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
     try {
       final userId = supabase.auth.currentUser!.id;
-      final profiles = ref.read(profilesProvider);
-      String? avatarUrl = profiles[userId]?.avatarUrl;
+      String? avatarUrl = profile?.avatarUrl;
+      final shouldClearAvatar = _removeCurrentAvatar;
 
       // Upload new avatar if selected.
-      if (_newAvatar != null) {
-        final bytes = await _newAvatar!.readAsBytes();
+      if (_newAvatarBytes != null && _newAvatarName != null) {
         final fileName =
-            '${DateTime.now().millisecondsSinceEpoch}_${_newAvatar!.name}';
+            '${DateTime.now().millisecondsSinceEpoch}_${_newAvatarName!}';
 
         await supabase.storage
             .from('avatars')
-            .uploadBinary('$userId/$fileName', bytes);
+            .uploadBinary('$userId/$fileName', _newAvatarBytes!);
 
         avatarUrl = supabase.storage
             .from('avatars')
@@ -55,15 +123,22 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           .read(profilesProvider.notifier)
           .updateProfile(
             userId: userId,
-            displayName: _displayNameController.text.trim(),
+            displayName: displayName,
             avatarUrl: avatarUrl,
+            clearAvatar: shouldClearAvatar,
           );
 
       if (!mounted) return;
+      setState(() {
+        _isEditing = false;
+        _isSaving = false;
+        _newAvatarBytes = null;
+        _newAvatarName = null;
+        _removeCurrentAvatar = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated successfully')),
       );
-      context.pop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -87,6 +162,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final user = supabase.auth.currentUser!;
     final profiles = ref.watch(profilesProvider);
     final profile = profiles[user.id];
+    final avatarImage = _buildAvatarImage(profile);
+    final currentDisplayName = profile?.displayName?.trim().isNotEmpty == true
+        ? profile!.displayName!
+        : 'Anonymous User';
+    final hasAvatar =
+        _newAvatarBytes != null ||
+        (!_removeCurrentAvatar && (profile?.avatarUrl?.isNotEmpty ?? false));
 
     if (!_hasSeededDisplayName &&
         _displayNameController.text.isEmpty &&
@@ -96,31 +178,69 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Profile')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _handleBackNavigation,
+        ),
+        title: const Text('My Profile'),
+        actions: [
+          if (_isEditing)
+            TextButton(
+              onPressed: _isSaving ? null : () => _cancelEditing(profile),
+              child: const Text('Cancel'),
+            )
+          else
+            IconButton(
+              tooltip: 'Edit profile',
+              onPressed: () => _beginEditing(profile),
+              icon: const Icon(Icons.edit),
+            ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar
-            Stack(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 CircleAvatar(
                   radius: 70,
-                  backgroundImage: profile?.avatarUrl != null
-                      ? CachedNetworkImageProvider(profile!.avatarUrl!)
-                      : null,
-                  child: profile?.avatarUrl == null
+                  backgroundImage: avatarImage,
+                  child: avatarImage == null
                       ? const Icon(Icons.person, size: 60)
                       : null,
                 ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: FloatingActionButton.small(
-                    onPressed: _pickAvatar,
-                    child: const Icon(Icons.camera_alt),
+                if (_isEditing) ...[
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _isSaving ? null : _pickAvatar,
+                          icon: const Icon(Icons.photo_camera_outlined),
+                          label: Text(
+                            _newAvatarBytes == null &&
+                                    profile?.avatarUrl != null
+                                ? 'Change Avatar'
+                                : 'Choose Avatar',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: _isSaving || !hasAvatar
+                              ? null
+                              : _removeAvatar,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Remove Avatar'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: 32),
@@ -136,25 +256,38 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             ),
             const SizedBox(height: 16),
 
-            // Editable display name
-            TextFormField(
-              controller: _displayNameController,
-              decoration: const InputDecoration(
-                labelText: 'Display Name',
-                border: OutlineInputBorder(),
+            if (_isEditing)
+              TextFormField(
+                controller: _displayNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Display Name',
+                  border: OutlineInputBorder(),
+                ),
+              )
+            else
+              TextFormField(
+                initialValue: currentDisplayName,
+                decoration: const InputDecoration(
+                  labelText: 'Display Name',
+                  border: OutlineInputBorder(),
+                ),
+                readOnly: true,
               ),
-            ),
             const SizedBox(height: 32),
 
-            FilledButton(
-              onPressed: _isSaving ? null : _saveProfile,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(54),
+            if (_isEditing)
+              FilledButton(
+                onPressed: _isSaving ? null : () => _saveProfile(profile),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(54),
+                ),
+                child: _isSaving
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'Save Changes',
+                        style: TextStyle(fontSize: 18),
+                      ),
               ),
-              child: _isSaving
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Save Changes', style: TextStyle(fontSize: 18)),
-            ),
           ],
         ),
       ),
