@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
 
+const _userNotSet = Object();
+
 // State class to hold authentication information
 class AuthState {
   final User? user;
@@ -13,9 +15,9 @@ class AuthState {
   bool get isAuthenticated => user != null;
 
   // Create a copy with optional updates
-  AuthState copyWith({User? user, bool? isLoading}) {
+  AuthState copyWith({Object? user = _userNotSet, bool? isLoading}) {
     return AuthState(
-      user: user ?? this.user,
+      user: identical(user, _userNotSet) ? this.user : user as User?,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -45,7 +47,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signIn(String email, String password) async {
     state = state.copyWith(isLoading: true);
     try {
-      await supabase.auth.signInWithPassword(email: email, password: password);
+      final response = await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (response.user == null || response.session == null) {
+        throw AuthException('Invalid email or password.');
+      }
+
+      state = state.copyWith(user: response.user);
     } catch (e) {
       rethrow;
     } finally {
@@ -57,11 +68,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signUp(String email, String password, String displayName) async {
     state = state.copyWith(isLoading: true);
     try {
-      await supabase.auth.signUp(
+      final response = await supabase.auth.signUp(
         email: email,
         password: password,
         data: {'display_name': displayName},
       );
+      state = state.copyWith(user: response.session?.user);
     } catch (e) {
       rethrow;
     } finally {
@@ -71,7 +83,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // Sign out the current user
   Future<void> signOut() async {
-    await supabase.auth.signOut();
+    state = state.copyWith(isLoading: true);
+    try {
+      await supabase.auth.signOut();
+      state = state.copyWith(user: null);
+    } catch (e) {
+      rethrow;
+    } finally {
+      state = state.copyWith(isLoading: false);
+    }
   }
 }
 

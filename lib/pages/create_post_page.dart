@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_blog_webapp/providers/posts_provider.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
+import 'package:flutter_blog_webapp/utils/error_utils.dart';
+import 'package:go_router/go_router.dart';
 
 class CreatePostPage extends ConsumerStatefulWidget {
   const CreatePostPage({super.key});
@@ -50,8 +51,12 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
     try {
       // Upload image to storage if selected
       if (_selectedImage != null) {
+        final currentUser = supabase.auth.currentUser;
+        if (currentUser == null) {
+          throw Exception('You must be logged in to create a post.');
+        }
         final bytes = await _selectedImage!.readAsBytes();
-        final userId = supabase.auth.currentUser!.id;
+        final userId = currentUser.id;
         final fileName =
             '${DateTime.now().millisecondsSinceEpoch}_${_selectedImage!.name}';
 
@@ -84,10 +89,11 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
         context.go('/home');
       }
     } catch (e) {
-      // Handle errors
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create post: ${e.toString()}')),
+        showErrorSnackBar(
+          context,
+          e,
+          fallbackMessage: 'Failed to create post. Please try again.',
         );
       }
     } finally {

@@ -3,9 +3,11 @@ import 'package:flutter_blog_webapp/models/comment.dart';
 import 'package:flutter_blog_webapp/models/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blog_webapp/models/post.dart';
+import 'package:flutter_blog_webapp/providers/comments_provider.dart';
 import 'package:flutter_blog_webapp/providers/posts_provider.dart';
 import 'package:flutter_blog_webapp/providers/profile_provider.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
+import 'package:flutter_blog_webapp/utils/error_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -57,6 +59,22 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     setState(() => _selectedCommentImage = image);
   }
 
+  Future<String> _uploadCommentImage(XFile image) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      throw Exception('You must be logged in to comment.');
+    }
+
+    final userId = currentUser.id;
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
+    final bytes = await image.readAsBytes();
+    final path = 'comments/$userId/$fileName';
+
+    await supabase.storage.from('post_images').uploadBinary(path, bytes);
+
+    return supabase.storage.from('post_images').getPublicUrl(path);
+  }
+
   Future<void> _addComment() async {
     final content = _commentController.text.trim();
     if (content.isEmpty) {
@@ -71,19 +89,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     try {
       String? uploadedUrl;
       if (_selectedCommentImage != null) {
-        // Upload selected comment image before inserting the comment row.
-        final userId = supabase.auth.currentUser!.id;
-        final fileName =
-            '${DateTime.now().millisecondsSinceEpoch}_${_selectedCommentImage!.name}';
-        final bytes = await _selectedCommentImage!.readAsBytes();
-
-        await supabase.storage
-            .from('post_images')
-            .uploadBinary('comments/$userId/$fileName', bytes);
-
-        uploadedUrl = supabase.storage
-            .from('post_images')
-            .getPublicUrl('comments/$userId/$fileName');
+        uploadedUrl = await _uploadCommentImage(_selectedCommentImage!);
       }
 
       await ref
@@ -100,9 +106,11 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       setState(() => _selectedCommentImage = null);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showErrorSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to add comment: $e')));
+        e,
+        fallbackMessage: 'Failed to add comment. Please try again.',
+      );
     } finally {
       if (mounted) setState(() => _isSubmittingComment = false);
     }
@@ -136,9 +144,11 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
       _handleBackNavigation();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showErrorSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to delete post: $e')));
+        e,
+        fallbackMessage: 'Failed to delete post. Please try again.',
+      );
     }
   }
 
@@ -170,87 +180,208 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           .deleteComment(commentId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showErrorSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to delete comment: $e')));
+        e,
+        fallbackMessage: 'Failed to delete comment. Please try again.',
+      );
     }
   }
 
   Future<void> _showEditCommentDialog(Comment comment) async {
     final controller = TextEditingController(text: comment.content);
     var isSaving = false;
+    XFile? selectedImage;
+    var removeExistingImage = false;
+    var editAsAnonymous = comment.isAnonymous;
     final messenger = ScaffoldMessenger.of(context);
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Edit comment'),
-          content: TextField(
-            controller: controller,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: 'Comment',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSaving ? null : () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: isSaving
-                  ? null
-                  : () async {
-                      final content = controller.text.trim();
-                      if (content.isEmpty) {
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Comment cannot be empty'),
-                          ),
-                        );
-                        return;
-                      }
+        builder: (dialogContext, setDialogState) {
+          final currentImageUrl = comment.imageUrl;
+          final hasSelectedImage = selectedImage != null;
+          final hasExistingImage =
+              currentImageUrl != null &&
+              currentImageUrl.isNotEmpty &&
+              !removeExistingImage;
+          final hasVisibleImage = hasSelectedImage || hasExistingImage;
 
-                      setDialogState(() => isSaving = true);
-                      try {
-                        await ref
-                            .read(
-                              commentsProviderFamily(widget.postId).notifier,
-                            )
-                            .updateComment(
-                              commentId: comment.id,
-                              content: content,
+          Future<void> pickReplacementImage() async {
+            final image = await _picker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 80,
+              maxWidth: 1200,
+            );
+
+            if (!mounted || !dialogContext.mounted || image == null) return;
+
+            setDialogState(() {
+              selectedImage = image;
+              removeExistingImage = false;
+            });
+          }
+
+          return AlertDialog(
+            title: const Text('Edit comment'),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Comment',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (hasVisibleImage) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: hasSelectedImage
+                            ? Image.network(
+                                selectedImage!.path,
+                                height: 140,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              )
+                            : CachedNetworkImage(
+                                imageUrl: currentImageUrl!,
+                                height: 140,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: isSaving ? null : pickReplacementImage,
+                          icon: const Icon(Icons.image_outlined),
+                          label: Text(
+                            hasVisibleImage ? 'Change image' : 'Add image',
+                          ),
+                        ),
+                        if (hasVisibleImage)
+                          TextButton.icon(
+                            onPressed: isSaving
+                                ? null
+                                : () => setDialogState(() {
+                                      selectedImage = null;
+                                      removeExistingImage = true;
+                                    }),
+                            icon: const Icon(Icons.close),
+                            label: const Text('Remove image'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Comment anonymously'),
+                      subtitle: const Text(
+                        'Your name will appear as Anonymous',
+                      ),
+                      value: editAsAnonymous,
+                      onChanged: isSaving
+                          ? null
+                          : (value) => setDialogState(
+                                () => editAsAnonymous = value,
+                              ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final content = controller.text.trim();
+                        if (content.isEmpty) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Comment cannot be empty'),
+                            ),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() => isSaving = true);
+                        try {
+                          String? updatedImageUrl;
+                          var updateImage = false;
+
+                          if (selectedImage != null) {
+                            updatedImageUrl = await _uploadCommentImage(
+                              selectedImage!,
                             );
+                            updateImage = true;
+                          } else if (removeExistingImage) {
+                            updatedImageUrl = null;
+                            updateImage = true;
+                          }
 
-                        if (!mounted || !dialogContext.mounted) return;
-                        Navigator.of(dialogContext).pop();
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Comment updated successfully'),
-                          ),
-                        );
-                      } catch (e) {
-                        if (!mounted || !dialogContext.mounted) return;
-                        setDialogState(() => isSaving = false);
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text('Failed to update comment: $e'),
-                          ),
-                        );
-                      }
-                    },
-              child: isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    )
-                  : const Text('Save'),
-            ),
-          ],
-        ),
+                          await ref
+                              .read(
+                                commentsProviderFamily(widget.postId).notifier,
+                              )
+                              .updateComment(
+                                commentId: comment.id,
+                                content: content,
+                                imageUrl: updatedImageUrl,
+                                updateImage: updateImage,
+                                isAnonymous: editAsAnonymous,
+                              );
+
+                          if (!mounted || !dialogContext.mounted) return;
+                          Navigator.of(dialogContext).pop();
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Comment updated successfully'),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!mounted || !dialogContext.mounted) return;
+                          setDialogState(() => isSaving = false);
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                formatAppError(
+                                  e,
+                                  fallbackMessage:
+                                      'Failed to update comment. Please try again.',
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      )
+                    : const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
 
@@ -311,7 +442,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Failed to load post\n${postState.error}',
+                      postState.error ?? 'Failed to load post.',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
@@ -483,7 +614,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     child: Column(
                       children: [
                         Text(
-                          'Failed to load comments\n${commentsState.error}',
+                          commentsState.error ?? 'Failed to load comments.',
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),

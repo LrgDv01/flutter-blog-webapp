@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
+import 'package:flutter_blog_webapp/utils/error_utils.dart';
+import 'package:flutter_blog_webapp/widgets/inline_error_banner.dart';
 import 'package:go_router/go_router.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -16,6 +18,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  String? _submitError;
+
+  void _clearSubmitError() {
+    if (_submitError == null) return;
+    setState(() => _submitError = null);
+  }
 
   @override
   void dispose() {
@@ -29,20 +37,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _login() async {
     // Validate form before proceeding
     if (!_formKey.currentState!.validate()) return;
+    if (_submitError != null) {
+      setState(() => _submitError = null);
+    }
 
     try {
       // Sign in user via auth provider
       await ref
           .read(authProvider.notifier)
           .signIn(_emailController.text.trim(), _passwordController.text);
-      // Navigate to home on success
-      if (mounted) context.go('/home');
     } catch (e) {
-      // Show error message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: ${e.toString()}')),
-        );
+        setState(() {
+          _submitError = formatAppError(
+            e,
+            fallbackMessage: 'Failed to sign in. Please try again.',
+          );
+        });
       }
     }
   }
@@ -69,7 +80,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Welcome Back!',
+                  'Welcome !',
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                 ),
                 const Text('Sign in to continue to your blog'),
@@ -84,6 +95,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.emailAddress,
+                  onChanged: (_) => _clearSubmitError(),
                   validator: (value) => value == null || !value.contains('@')
                       ? 'Enter a valid email'
                       : null,
@@ -109,11 +121,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
+                  onChanged: (_) => _clearSubmitError(),
                   validator: (value) => value == null || value.length < 6
                       ? 'Password too short'
                       : null,
                 ),
                 const SizedBox(height: 24),
+
+                if (_submitError != null) ...[
+                  const SizedBox(height: 16),
+                  InlineErrorBanner(message: _submitError!),
+                  const SizedBox(height: 16),
+                ],
 
                 // Login button
                 SizedBox(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
+import 'package:flutter_blog_webapp/utils/error_utils.dart';
+import 'package:flutter_blog_webapp/widgets/inline_error_banner.dart';
 import 'package:go_router/go_router.dart';
 
 // ConsumerStatefulWidget to access Riverpod providers
@@ -17,15 +19,23 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   // Text controllers for form inputs
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _displayNameController = TextEditingController();
   // Toggle password visibility
   bool _obscurePassword = true;
+  String? _submitError;
+
+  void _clearSubmitError() {
+    if (_submitError == null) return;
+    setState(() => _submitError = null);
+  }
 
   @override
   void dispose() {
     // Clean up controllers
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _displayNameController.dispose();
     super.dispose();
   }
@@ -33,6 +43,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   // Register user with form validation
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_submitError != null) {
+      setState(() => _submitError = null);
+    }
 
     try {
       // Call sign up method from auth provider
@@ -47,7 +60,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Please check your email.'),
+            content: Text('Registration successful!'),
           ),
         );
         // Navigate to login page
@@ -55,10 +68,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       }
     } catch (e) {
       if (mounted) {
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Registration failed: ${e.toString()}')),
-        );
+        setState(() {
+          _submitError = formatAppError(
+            e,
+            fallbackMessage: 'Failed to create your account. Please try again.',
+          );
+        });
       }
     }
   }
@@ -86,6 +101,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     prefixIcon: Icon(Icons.person),
                     border: OutlineInputBorder(),
                   ),
+                  onChanged: (_) => _clearSubmitError(),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Enter a display name'
                       : null,
@@ -100,6 +116,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     prefixIcon: Icon(Icons.email),
                     border: OutlineInputBorder(),
                   ),
+                  onChanged: (_) => _clearSubmitError(),
                   validator: (value) => value == null || !value.contains('@')
                       ? 'Enter a valid email'
                       : null,
@@ -124,11 +141,50 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
+                  onChanged: (_) => _clearSubmitError(),
                   validator: (value) => value == null || value.length < 6
                       ? 'Minimum 6 characters'
                       : null,
                 ),
                 const SizedBox(height: 24),
+
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm Password',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  onChanged: (_) => _clearSubmitError(),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Confirm your password';
+                    }
+
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                if (_submitError != null) ...[
+                  const SizedBox(height: 16),
+                  InlineErrorBanner(message: _submitError!),
+                  const SizedBox(height: 16),
+                ],
 
                 // Register button with loading state
                 SizedBox(

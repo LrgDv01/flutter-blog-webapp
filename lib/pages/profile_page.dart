@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_blog_webapp/models/profile.dart';
 import 'package:flutter_blog_webapp/providers/profile_provider.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
+import 'package:flutter_blog_webapp/utils/error_utils.dart';
 import 'package:go_router/go_router.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -101,7 +102,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     setState(() => _isSaving = true);
     try {
-      final userId = supabase.auth.currentUser!.id;
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('You must be logged in to update your profile.');
+      }
+      final userId = currentUser.id;
       String? avatarUrl = profile?.avatarUrl;
       final shouldClearAvatar = _removeCurrentAvatar;
 
@@ -141,9 +146,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showErrorSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+        e,
+        fallbackMessage: 'Failed to update profile. Please try again.',
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -159,7 +166,31 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = supabase.auth.currentUser!;
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('My Profile')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'You are no longer signed in. Please log in again.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () => context.go('/login'),
+                  child: const Text('Go to Login'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final profiles = ref.watch(profilesProvider);
     final profile = profiles[user.id];
     final avatarImage = _buildAvatarImage(profile);

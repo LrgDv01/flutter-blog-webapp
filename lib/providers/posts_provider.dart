@@ -1,7 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_blog_webapp/models/comment.dart';
 import 'package:flutter_blog_webapp/models/post.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
+import 'package:flutter_blog_webapp/utils/error_utils.dart';
+
+List<Post> _parsePosts(List<dynamic> response) {
+  return response
+      .map((json) => Post.fromJson(Map<String, dynamic>.from(json)))
+      .toList();
+}
+
+String _requireUserId(String action) {
+  final userId = supabase.auth.currentUser?.id;
+  if (userId == null) {
+    throw Exception('You must be logged in to $action.');
+  }
+
+  return userId;
+}
 
 // State for the main posts feed.
 class PostsState {
@@ -26,59 +41,39 @@ class PostsState {
   }
 }
 
-// State for comments tied to a single post.
-class CommentsState {
-  final List<Comment> comments;
-  final bool isLoading;
-  final String? error;
-
-  const CommentsState({
-    this.comments = const [],
-    this.isLoading = false,
-    this.error,
-  });
-
-  CommentsState copyWith({
-    List<Comment>? comments,
-    bool? isLoading,
-    String? error,
-    bool clearError = false,
-  }) {
-    // Same error reset behavior as PostsState.
-    return CommentsState(
-      comments: comments ?? this.comments,
-      isLoading: isLoading ?? this.isLoading,
-      error: clearError ? null : (error ?? this.error),
-    );
-  }
-}
-
 class PostsNotifier extends StateNotifier<PostsState> {
   PostsNotifier() : super(const PostsState()) {
     // Warm the feed as soon as the provider is first created.
     fetchPosts();
   }
 
+  void _setLoading() {
+    state = state.copyWith(isLoading: true, clearError: true);
+  }
+
+  void _setError(Object error, {String fallbackMessage = 'Failed to load posts.'}) {
+    state = state.copyWith(
+      isLoading: false,
+      error: formatAppError(error, fallbackMessage: fallbackMessage),
+    );
+  }
+
   // Used by initial load and pull-to-refresh.
   Future<void> fetchPosts() async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    _setLoading();
     try {
       final response = await supabase
           .from('posts')
           .select()
           .order('created_at', ascending: false);
 
-      // print('Post ITO : $response');
-
       state = state.copyWith(
-        posts: (response as List)
-            .map((json) => Post.fromJson(Map<String, dynamic>.from(json)))
-            .toList(),
+        posts: _parsePosts(response),
         isLoading: false,
         clearError: true,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      _setError(e, fallbackMessage: 'Failed to load posts.');
     }
   }
 
@@ -89,23 +84,19 @@ class PostsNotifier extends StateNotifier<PostsState> {
     String? imageUrl,
     bool isAnonymous = false,
   }) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    _setLoading();
     try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        throw Exception('You must be logged in to create a post.');
-      }
-
+      final userId = _requireUserId('create a post');
       await supabase.from('posts').insert({
         'title': title,
         'content': content,
-        'user_id': user.id,
+        'user_id': userId,
         'image_url': imageUrl,
         'is_anonymous': isAnonymous,
       });
       await fetchPosts();
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      _setError(e, fallbackMessage: 'Failed to create post.');
       rethrow;
     }
   }
@@ -117,7 +108,7 @@ class PostsNotifier extends StateNotifier<PostsState> {
     String? imageUrl,
     bool? isAnonymous,
   }) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    _setLoading();
     try {
       final updateData = <String, dynamic>{
         'title': title,
@@ -132,18 +123,18 @@ class PostsNotifier extends StateNotifier<PostsState> {
       await supabase.from('posts').update(updateData).eq('id', postId);
       await fetchPosts();
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      _setError(e, fallbackMessage: 'Failed to update post.');
       rethrow;
     }
   }
 
   Future<void> deletePost(String postId) async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    _setLoading();
     try {
       await supabase.from('posts').delete().eq('id', postId);
       await fetchPosts();
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      _setError(e, fallbackMessage: 'Failed to delete post.');
       rethrow;
     }
   }
@@ -153,98 +144,3 @@ class PostsNotifier extends StateNotifier<PostsState> {
 final postsProvider = StateNotifierProvider<PostsNotifier, PostsState>(
   (ref) => PostsNotifier(),
 );
-
-class CommentsNotifier extends StateNotifier<CommentsState> {
-  final String postId;
-  CommentsNotifier(this.postId) : super(const CommentsState()) {
-    // Load comments for this post instance immediately.
-    fetchComments();
-  }
-
-  // Reload comments whenever a comment is added/removed.
-  Future<void> fetchComments() async {
-    state = state.copyWith(isLoading: true, clearError: true);
-    try {
-      final response = await supabase
-          .from('comments')
-          .select()
-          .eq('post_id', postId)
-          // Keep newest comments near the composer at the top of the page.
-          .order('created_at', ascending: false);
-
-      state = state.copyWith(
-        comments: (response as List)
-            .map((json) => Comment.fromJson(Map<String, dynamic>.from(json)))
-            .toList(),
-        isLoading: false,
-        clearError: true,
-      );
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
-  }
-
-  Future<void> addComment({
-    required String content,
-    String? imageUrl,
-    bool isAnonymous = false,
-  }) async {
-    state = state.copyWith(isLoading: true, clearError: true);
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        throw Exception('You must be logged in to comment.');
-      }
-
-      await supabase.from('comments').insert({
-        'post_id': postId,
-        'user_id': user.id,
-        'content': content,
-        'image_url': imageUrl,
-        'is_anonymous': isAnonymous,
-      });
-      await fetchComments();
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-      rethrow;
-    }
-  }
-
-  Future<void> deleteComment(String commentId) async {
-    state = state.copyWith(isLoading: true, clearError: true);
-    try {
-      await supabase.from('comments').delete().eq('id', commentId);
-      await fetchComments();
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-      rethrow;
-    }
-  }
-
-  Future<void> updateComment({
-    required String commentId,
-    required String content,
-  }) async {
-    state = state.copyWith(isLoading: true, clearError: true);
-    try {
-      await supabase
-          .from('comments')
-          .update({
-            'content': content,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', commentId);
-      await fetchComments();
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-      rethrow;
-    }
-  }
-}
-
-// Family creates one comments stream/state per post id.
-final commentsProviderFamily =
-    StateNotifierProvider.family<CommentsNotifier, CommentsState, String>(
-      // One comments notifier instance per post id.
-      (ref, postId) => CommentsNotifier(postId),
-    );

@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_blog_webapp/models/profile.dart';
 import 'package:flutter_blog_webapp/providers/auth_provider.dart';
 import 'package:flutter_blog_webapp/providers/posts_provider.dart';
 import 'package:flutter_blog_webapp/providers/profile_provider.dart';
+import 'package:flutter_blog_webapp/utils/error_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +13,55 @@ class HomePage extends ConsumerWidget {
 
   Future<void> _refreshPosts(WidgetRef ref) async {
     await ref.read(postsProvider.notifier).fetchPosts();
+  }
+
+  Future<bool> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You will need to sign in again to continue.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+
+    return confirmed ?? false;
+  }
+
+  Future<void> _handleLogout(BuildContext context, WidgetRef ref) async {
+    final shouldLogout = await _confirmLogout(context);
+    if (!context.mounted || !shouldLogout) return;
+
+    try {
+      await ref.read(authProvider.notifier).signOut();
+      if (context.mounted) context.go('/login');
+    } catch (e) {
+      if (context.mounted) {
+        showErrorSnackBar(
+          context,
+          e,
+          fallbackMessage: 'Failed to log out. Please try again.',
+        );
+      }
+    }
+  }
+
+  ImageProvider<Object>? _buildPostAvatar(Profile? profile, bool isAnonymous) {
+    final avatarUrl = profile?.avatarUrl?.trim();
+    if (isAnonymous || avatarUrl == null || avatarUrl.isEmpty) {
+      return null;
+    }
+
+    return CachedNetworkImageProvider(avatarUrl);
   }
 
   @override
@@ -64,10 +115,7 @@ class HomePage extends ConsumerWidget {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ref.read(authProvider.notifier).signOut();
-              if (context.mounted) context.go('/login');
-            },
+            onPressed: () => _handleLogout(context, ref),
           ),
         ],
       ),
@@ -91,7 +139,7 @@ class HomePage extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Failed to load posts\n${postsState.error}',
+                      postsState.error ?? 'Failed to load posts.',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
@@ -153,12 +201,21 @@ class HomePage extends ConsumerWidget {
                 final post = posts[actualIndex];
                 // Current user's posts are labeled as "You" for quick scanning.
                 final isMyPost = post.userId == authState.user?.id;
+                final authorProfile = profiles[post.userId];
+                final profileDisplayName = authorProfile?.displayName?.trim();
                 // For non-anonymous posts, resolve the author's display name from the profiles provider.
                 final resolvedDisplayName =
-                    profiles[post.userId]?.displayName ?? 'Unknown User';
+                    (profileDisplayName?.isNotEmpty == true
+                        ? profileDisplayName!
+                        : null) ??
+                    'Unknown User';
                 final authorName = isMyPost
                     ? (post.isAnonymous ? 'You (Anonymous)' : 'You')
                     : (post.isAnonymous ? 'Anonymous' : resolvedDisplayName);
+                final authorAvatar = _buildPostAvatar(
+                  authorProfile,
+                  post.isAnonymous,
+                );
 
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
@@ -207,17 +264,31 @@ class HomePage extends ConsumerWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(height: 1.4),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 12),
                               // Metadata line keeps author/date compact in list cards.
-                              Text(
-                                authorName == 'You' ||
-                                        authorName == 'You (Anonymous)'
-                                    ? '$authorName | Posted ${post.createdAt.toString().substring(0, 10)}'
-                                    : 'By $authorName | Posted ${post.createdAt.toString().substring(0, 10)}',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundImage: authorAvatar,
+                                    child: authorAvatar == null
+                                        ? const Icon(Icons.person, size: 18)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      authorName == 'You' ||
+                                              authorName == 'You (Anonymous)'
+                                          ? '$authorName | Posted ${post.createdAt.toString().substring(0, 10)}'
+                                          : 'By $authorName | Posted ${post.createdAt.toString().substring(0, 10)}',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

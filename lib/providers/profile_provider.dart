@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
 import 'package:flutter_blog_webapp/models/profile.dart';
+import 'package:flutter_blog_webapp/utils/error_utils.dart';
 
 class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
   ProfilesNotifier() : super({}) {
@@ -8,21 +9,29 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
     _fetchAllProfiles();
   }
 
-  Future<void> _fetchAllProfiles() async {
-    // Load profile fields used by post/comment author display.
-    final data = await supabase
-        .from('profiles')
-        .select(
-          'id, user_id, display_name, avatar_url, created_at, updated_at',
-        );
+  Future<void> _fetchAllProfiles({bool rethrowOnError = false}) async {
+    try {
+      // Load profile fields used by post/comment author display.
+      final data = await supabase
+          .from('profiles')
+          .select(
+            'id, user_id, display_name, avatar_url, created_at, updated_at',
+          );
 
-    // Key profiles by user id for quick lookups across the app.
-    final map = <String, Profile>{};
-    for (final row in data) {
-      final profile = Profile.fromJson(Map<String, dynamic>.from(row));
-      map[profile.userId] = profile;
+      // Key profiles by user id for quick lookups across the app.
+      final map = <String, Profile>{};
+      for (final row in data) {
+        final profile = Profile.fromJson(Map<String, dynamic>.from(row));
+        map[profile.userId] = profile;
+      }
+      state = map;
+    } catch (e) {
+      if (rethrowOnError) {
+        throw Exception(
+          formatAppError(e, fallbackMessage: 'Failed to refresh profiles.'),
+        );
+      }
     }
-    state = map;
   }
 
   Profile? getProfile(String userId) => state[userId];
@@ -38,45 +47,53 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
     String? avatarUrl,
     bool clearAvatar = false,
   }) async {
-    final timestamp = DateTime.now().toIso8601String();
-    final existingProfile = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
+    try {
+      final timestamp = DateTime.now().toIso8601String();
+      final existingProfile = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
 
-    if (existingProfile == null) {
-      final insertData = <String, dynamic>{
-        'user_id': userId,
-        'display_name': ?displayName,
-        'updated_at': timestamp,
-      };
+      if (existingProfile == null) {
+        final insertData = <String, dynamic>{
+          'user_id': userId,
+          'display_name': ?displayName,
+          'updated_at': timestamp,
+        };
 
-      if (clearAvatar) {
-        insertData['avatar_url'] = null;
-      } else if (avatarUrl != null) {
-        insertData['avatar_url'] = avatarUrl;
+        if (clearAvatar) {
+          insertData['avatar_url'] = null;
+        } else if (avatarUrl != null) {
+          insertData['avatar_url'] = avatarUrl;
+        }
+
+        await supabase.from('profiles').insert(insertData);
+      } else {
+        final updateData = <String, dynamic>{'updated_at': timestamp};
+
+        if (displayName != null) {
+          updateData['display_name'] = displayName;
+        }
+
+        if (clearAvatar) {
+          updateData['avatar_url'] = null;
+        } else if (avatarUrl != null) {
+          updateData['avatar_url'] = avatarUrl;
+        }
+
+        await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('user_id', userId);
       }
-
-      await supabase.from('profiles').insert(insertData);
-    } else {
-      final updateData = <String, dynamic>{'updated_at': timestamp};
-
-      if (displayName != null) {
-        updateData['display_name'] = displayName;
-      }
-
-      if (clearAvatar) {
-        updateData['avatar_url'] = null;
-      } else if (avatarUrl != null) {
-        updateData['avatar_url'] = avatarUrl;
-      }
-
-      await supabase.from('profiles').update(updateData).eq('user_id', userId);
+      // Refresh the entire cache to reflect the updated profile across the app.
+      await _fetchAllProfiles(rethrowOnError: true);
+    } catch (e) {
+      throw Exception(
+        formatAppError(e, fallbackMessage: 'Failed to update profile.'),
+      );
     }
-
-    // Refresh the entire cache to reflect the updated profile across the app.
-    await _fetchAllProfiles();
   }
 }
 

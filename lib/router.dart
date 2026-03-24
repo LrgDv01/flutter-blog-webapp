@@ -11,16 +11,16 @@ import 'package:flutter_blog_webapp/pages/profile_page.dart';
 
 // Provides a GoRouter instance with authentication-based routing
 final routerProvider = Provider<GoRouter>((ref) {
-  // Watch auth state to determine user authentication status
-  final authState = ref.watch(authProvider);
+  // Only watch authentication status so loading state changes do not recreate the router.
+  final isLoggedIn = ref.watch(
+    authProvider.select((authState) => authState.isAuthenticated),
+  );
 
   return GoRouter(
     initialLocation: '/login', // Start at login page
-    debugLogDiagnostics: true, // Enable debug logging
+    debugLogDiagnostics: false,
     // Handle navigation redirects based on auth state
     redirect: (context, state) {
-      final isLoggedIn = authState.isAuthenticated;
-
       final isLoggingIn = state.matchedLocation == '/login';
       final isRegistering = state.matchedLocation == '/register';
 
