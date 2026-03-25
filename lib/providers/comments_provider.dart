@@ -151,7 +151,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
         'updated_at': DateTime.now().toIso8601String(),
         // Only send image changes when the user actually changed that field.
         if (updateImage) 'image_url': imageUrl,
-        if (isAnonymous != null) 'is_anonymous': isAnonymous,
+        'is_anonymous': ?isAnonymous,
       };
 
       final updatedRows = await supabase
