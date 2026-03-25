@@ -26,6 +26,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   String? _submitError;
 
   void _clearSubmitError() {
+    // Clear stale submit errors once the user edits the form again.
     if (_submitError == null) return;
     setState(() => _submitError = null);
   }
@@ -148,6 +149,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
                 const SizedBox(height: 24),
 
+                // Reuse the same visibility toggle for both password fields.
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: _obscurePassword,
@@ -181,6 +183,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 const SizedBox(height: 24),
 
                 if (_submitError != null) ...[
+                  // Keep submit errors close to the form fields that caused them.
                   const SizedBox(height: 16),
                   InlineErrorBanner(message: _submitError!),
                   const SizedBox(height: 16),

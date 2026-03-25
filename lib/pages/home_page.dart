@@ -34,6 +34,7 @@ class HomePage extends ConsumerWidget {
       ),
     );
 
+    // Treat dismissing the dialog the same as cancelling.
     return confirmed ?? false;
   }
 
@@ -57,6 +58,7 @@ class HomePage extends ConsumerWidget {
 
   ImageProvider<Object>? _buildPostAvatar(Profile? profile, bool isAnonymous) {
     final avatarUrl = profile?.avatarUrl?.trim();
+    // Anonymous posts should never expose the author's avatar.
     if (isAnonymous || avatarUrl == null || avatarUrl.isEmpty) {
       return null;
     }
@@ -76,6 +78,7 @@ class HomePage extends ConsumerWidget {
         : profiles[currentUserId];
     final metadataDisplayName =
         authState.user?.userMetadata?['display_name'] as String?;
+    // Prefer the cached profile name, then auth metadata, then a safe fallback.
     final currentDisplayName =
         currentProfile?.displayName?.trim().isNotEmpty == true
         ? currentProfile!.displayName!
@@ -91,6 +94,7 @@ class HomePage extends ConsumerWidget {
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         actions: [
+          // Keep the signed-in user visible in the app bar for quick context.
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 140),
@@ -119,6 +123,8 @@ class HomePage extends ConsumerWidget {
           ),
         ],
       ),
+      // The floating action button provides quick access to creating a new post,
+      // which is a primary action in this app.
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.go('/create-post'),
         child: const Icon(Icons.add),
@@ -168,6 +174,8 @@ class HomePage extends ConsumerWidget {
             );
           }
 
+          // When there are cached posts, we show an inline error banner if the latest refresh failed,
+          // so the user can still see existing content and choose when to retry.
           return RefreshIndicator(
             onRefresh: () => _refreshPosts(ref),
             child: ListView.builder(
@@ -217,6 +225,7 @@ class HomePage extends ConsumerWidget {
                   post.isAnonymous,
                 );
 
+                // Each post card is tappable to navigate to the post detail page.
                 return InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () => context.go('/post/${post.id}'),

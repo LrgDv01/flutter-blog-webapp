@@ -17,6 +17,8 @@ class ProfilePage extends ConsumerStatefulWidget {
   ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
+// This page allows users to view and edit their profile information,
+// including their display name and avatar image. 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _displayNameController = TextEditingController();
   final _picker = ImagePicker();
@@ -29,6 +31,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   void _handleBackNavigation() => context.go('/home');
 
+  // Start from the saved profile so editing never reuses stale local state.
   void _beginEditing(Profile? profile) {
     setState(() {
       _isEditing = true;
@@ -39,6 +42,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     });
   }
 
+  // Restore the last saved values when the user abandons edits.
   void _cancelEditing(Profile? profile) {
     setState(() {
       _isEditing = false;
@@ -49,6 +53,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     });
   }
 
+  // Pick a new avatar image from the user's device and store it locally until the user saves their changes.
   Future<void> _pickAvatar() async {
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
@@ -76,6 +81,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   ImageProvider<Object>? _buildAvatarImage(Profile? profile) {
+    // Prefer the local preview, then the saved avatar, then the icon fallback.
     if (_removeCurrentAvatar) {
       return null;
     }
@@ -91,6 +97,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     return null;
   }
 
+  // Fetch all profiles to ensure we have the latest data for the current user,
+  // but also to keep the cache updated for other users' profiles that may be displayed across the app.
   Future<void> _saveProfile(Profile? profile) async {
     final displayName = _displayNameController.text.trim();
     if (displayName.isEmpty) {
@@ -124,6 +132,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             .getPublicUrl('$userId/$fileName');
       }
 
+      // Update the profile with the new display name and avatar URL, or clear the avatar if requested.
+      // The provider will re-fetch all profiles to keep the cache in sync.
       await ref
           .read(profilesProvider.notifier)
           .updateProfile(
@@ -204,6 +214,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (!_hasSeededDisplayName &&
         _displayNameController.text.isEmpty &&
         profile?.displayName != null) {
+      // Seed once so later rebuilds do not overwrite in-progress edits.
       _displayNameController.text = profile!.displayName!;
       _hasSeededDisplayName = true;
     }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Normalize backend/storage/auth errors into user-facing copy.
 String formatAppError(
   Object error, {
   String fallbackMessage = 'Something went wrong. Please try again.',
@@ -24,11 +25,13 @@ String formatAppError(
     return message.isEmpty ? fallbackMessage : message;
   }
 
+  // Handle Supabase/Postgrest/Storage exceptions with specific formatting.
   if (error is PostgrestException) {
     final message = error.message.trim();
     return message.isEmpty ? fallbackMessage : message;
   }
 
+  // Storage exceptions can be noisy, so we trim them down to just the message.
   if (error is StorageException) {
     final message = error.message.trim();
     return message.isEmpty ? fallbackMessage : message;
@@ -39,6 +42,7 @@ String formatAppError(
       .replaceFirst(RegExp(r'^Exception:\s*'), '')
       .trim();
 
+  // Strip generic exception prefixes before showing raw messages.
   if (cleaned.isEmpty || cleaned == 'null') {
     return fallbackMessage;
   }
@@ -51,6 +55,7 @@ void showErrorSnackBar(
   Object error, {
   String fallbackMessage = 'Something went wrong. Please try again.',
 }) {
+  // Route snack bars through the shared formatter for consistent messaging.
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(

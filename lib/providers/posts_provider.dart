@@ -3,12 +3,14 @@ import 'package:flutter_blog_webapp/models/post.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
 import 'package:flutter_blog_webapp/utils/error_utils.dart';
 
+// Keep feed row parsing in one helper.
 List<Post> _parsePosts(List<dynamic> response) {
   return response
       .map((json) => Post.fromJson(Map<String, dynamic>.from(json)))
       .toList();
 }
 
+// Reuse one auth guard across post write operations.
 String _requireUserId(String action) {
   final userId = supabase.auth.currentUser?.id;
   if (userId == null) {
@@ -48,10 +50,12 @@ class PostsNotifier extends StateNotifier<PostsState> {
   }
 
   void _setLoading() {
+    // Reset stale errors when starting a new request.
     state = state.copyWith(isLoading: true, clearError: true);
   }
 
   void _setError(Object error, {String fallbackMessage = 'Failed to load posts.'}) {
+    // Store already-formatted errors so the UI can render them directly.
     state = state.copyWith(
       isLoading: false,
       error: formatAppError(error, fallbackMessage: fallbackMessage),
@@ -101,6 +105,7 @@ class PostsNotifier extends StateNotifier<PostsState> {
     }
   }
 
+  // Updates are done in-place, so we don't have to worry about list ordering changes.
   Future<void> updatePost({
     required String postId,
     required String title,
@@ -128,6 +133,7 @@ class PostsNotifier extends StateNotifier<PostsState> {
     }
   }
 
+  // Deletes the post and all its comments in one go with RLS cascade rules.
   Future<void> deletePost(String postId) async {
     _setLoading();
     try {

@@ -3,12 +3,14 @@ import 'package:flutter_blog_webapp/models/comment.dart';
 import 'package:flutter_blog_webapp/supabase_client.dart';
 import 'package:flutter_blog_webapp/utils/error_utils.dart';
 
+// Keep Supabase row parsing in one place.
 List<Comment> _parseComments(List<dynamic> response) {
   return response
       .map((json) => Comment.fromJson(Map<String, dynamic>.from(json)))
       .toList();
 }
 
+// Reuse one auth guard across comment write operations.
 String _requireUserId(String action) {
   final userId = supabase.auth.currentUser?.id;
   if (userId == null) {
@@ -18,6 +20,7 @@ String _requireUserId(String action) {
   return userId;
 }
 
+// State for the comments thread on the post detail page.
 class CommentsState {
   final List<Comment> comments;
   final bool isLoading;
@@ -35,6 +38,7 @@ class CommentsState {
     String? error,
     bool clearError = false,
   }) {
+    // `clearError` removes stale errors after a successful retry.
     return CommentsState(
       comments: comments ?? this.comments,
       isLoading: isLoading ?? this.isLoading,
@@ -43,6 +47,7 @@ class CommentsState {
   }
 }
 
+// State management for comments on the post detail page.
 class CommentsNotifier extends StateNotifier<CommentsState> {
   final String postId;
 
@@ -51,7 +56,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
   }
 
   void _setLoading() {
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = state.copyWith(isLoading: true, clearError: true); // Reset stale errors when starting a new request.
   }
 
   void _setError(
@@ -65,6 +70,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
   }
 
   void _replaceComment(Comment updatedComment) {
+    // Update the edited row in place instead of fetching the whole thread again.
     state = state.copyWith(
       comments: [
         for (final comment in state.comments)
@@ -75,6 +81,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
     );
   }
 
+  // Fetch all comments for the post, ordered by creation time with newest first.
   Future<void> fetchComments() async {
     _setLoading();
     try {
@@ -94,6 +101,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
     }
   }
 
+  // Creates a new comment with the current user's ID. RLS rules will prevent unauthorized inserts.
   Future<void> addComment({
     required String content,
     String? imageUrl,
@@ -116,6 +124,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
     }
   }
 
+  // Deletes the comment if it belongs to the current user. RLS rules will prevent unauthorized deletions.
   Future<void> deleteComment(String commentId) async {
     _setLoading();
     try {
@@ -127,6 +136,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
     }
   }
 
+  // Updates are done in-place, so we don't have to worry about list ordering changes.
   Future<void> updateComment({
     required String commentId,
     required String content,
@@ -139,6 +149,7 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
       final payload = {
         'content': content,
         'updated_at': DateTime.now().toIso8601String(),
+        // Only send image changes when the user actually changed that field.
         if (updateImage) 'image_url': imageUrl,
         if (isAnonymous != null) 'is_anonymous': isAnonymous,
       };
@@ -155,10 +166,11 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
         );
       }
 
+      // Update the edited row in place instead of fetching the whole thread again.
       final updatedComment = Comment.fromJson(
         Map<String, dynamic>.from(updatedRows.first),
       );
-      _replaceComment(updatedComment);
+      _replaceComment(updatedComment); 
     } catch (e) {
       _setError(e, fallbackMessage: 'Failed to update comment.');
       rethrow;
@@ -168,5 +180,6 @@ class CommentsNotifier extends StateNotifier<CommentsState> {
 
 final commentsProviderFamily =
     StateNotifierProvider.family<CommentsNotifier, CommentsState, String>(
+      // Create one comments state per post detail page.
       (ref, postId) => CommentsNotifier(postId),
     );

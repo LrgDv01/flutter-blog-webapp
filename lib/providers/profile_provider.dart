@@ -26,6 +26,7 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
       }
       state = map;
     } catch (e) {
+      // Initial cache warm-up can fail quietly; explicit refreshes can opt in to errors.
       if (rethrowOnError) {
         throw Exception(
           formatAppError(e, fallbackMessage: 'Failed to refresh profiles.'),
@@ -34,6 +35,7 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
     }
   }
 
+  // Read a single cached profile without exposing the map shape to callers.
   Profile? getProfile(String userId) => state[userId];
 
   // Keep UI labels readable while a profile is missing.
@@ -49,6 +51,7 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
   }) async {
     try {
       final timestamp = DateTime.now().toIso8601String();
+      // Check whether this user already has a profile row to update.
       final existingProfile = await supabase
           .from('profiles')
           .select('id')
@@ -62,6 +65,7 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
           'updated_at': timestamp,
         };
 
+        // New profiles can be created with or without an avatar, but existing avatars must be explicitly cleared by the user.
         if (clearAvatar) {
           insertData['avatar_url'] = null;
         } else if (avatarUrl != null) {
@@ -75,7 +79,7 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
         if (displayName != null) {
           updateData['display_name'] = displayName;
         }
-
+        
         if (clearAvatar) {
           updateData['avatar_url'] = null;
         } else if (avatarUrl != null) {
@@ -90,6 +94,7 @@ class ProfilesNotifier extends StateNotifier<Map<String, Profile>> {
       // Refresh the entire cache to reflect the updated profile across the app.
       await _fetchAllProfiles(rethrowOnError: true);
     } catch (e) {
+      // Bubble up formatted errors so pages can show user-friendly messages.
       throw Exception(
         formatAppError(e, fallbackMessage: 'Failed to update profile.'),
       );

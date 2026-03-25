@@ -29,6 +29,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
   // Controls whether the next comment hides the user's name.
   bool _commentAsAnonymous = false;
 
+  // Use a fixed route target so back navigation always returns to the feed.
   void _handleBackNavigation() => context.go('/home');
 
   // Finds the current post from the feed state if it is already loaded.
@@ -47,6 +48,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     ]);
   }
 
+  // This method handles picking an image for a comment.
   Future<void> _pickCommentImage() async {
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
@@ -59,6 +61,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     setState(() => _selectedCommentImage = image);
   }
 
+  // Upload the selected comment image to Supabase Storage and return the public URL.
   Future<String> _uploadCommentImage(XFile image) async {
     final currentUser = supabase.auth.currentUser;
     if (currentUser == null) {
@@ -68,6 +71,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     final userId = currentUser.id;
     final fileName = '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
     final bytes = await image.readAsBytes();
+    // Group uploaded comment images by user for predictable storage paths.
     final path = 'comments/$userId/$fileName';
 
     await supabase.storage.from('post_images').uploadBinary(path, bytes);
@@ -75,6 +79,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     return supabase.storage.from('post_images').getPublicUrl(path);
   }
 
+  // This method handles adding a new comment, including optional image upload and error handling.
   Future<void> _addComment() async {
     final content = _commentController.text.trim();
     if (content.isEmpty) {
@@ -116,6 +121,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
+  // Builds the display name for a comment, falling back to "Anonymous"
+  // when the comment is marked as anonymous or the profile data is missing.
   Future<void> _showDeletePostDialog() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -152,6 +159,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     }
   }
 
+  // Similar dialog for comment deletion, but only deletes the comment instead of the whole post.
   Future<void> _showDeleteCommentDialog(String commentId) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -196,6 +204,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     var editAsAnonymous = comment.isAnonymous;
     final messenger = ScaffoldMessenger.of(context);
 
+    // The dialog manages its own temporary image and anonymity state.
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -208,6 +217,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
               !removeExistingImage;
           final hasVisibleImage = hasSelectedImage || hasExistingImage;
 
+          // This method allows the user to pick a replacement image for their comment, or add one if it didn't have one before.
           Future<void> pickReplacementImage() async {
             final image = await _picker.pickImage(
               source: ImageSource.gallery,
@@ -215,7 +225,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
               maxWidth: 1200,
             );
 
-            if (!mounted || !dialogContext.mounted || image == null) return;
+            if (!mounted || !dialogContext.mounted || image == null) return; // Check if dialog is still open and user didn't cancel picker.
 
             setDialogState(() {
               selectedImage = image;
@@ -265,7 +275,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                       runSpacing: 8,
                       children: [
                         OutlinedButton.icon(
-                          onPressed: isSaving ? null : pickReplacementImage,
+                          onPressed: isSaving ? null : pickReplacementImage, // Allow changing or adding an image, but disable while saving to prevent state conflicts.
                           icon: const Icon(Icons.image_outlined),
                           label: Text(
                             hasVisibleImage ? 'Change image' : 'Add image',
@@ -347,7 +357,8 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                                 updateImage: updateImage,
                                 isAnonymous: editAsAnonymous,
                               );
-
+                          
+                          // Close the dialog and show a success message after the comment is updated.
                           if (!mounted || !dialogContext.mounted) return;
                           Navigator.of(dialogContext).pop();
                           messenger.showSnackBar(
@@ -356,7 +367,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                             ),
                           );
                         } catch (e) {
-                          if (!mounted || !dialogContext.mounted) return;
+                          if (!mounted || !dialogContext.mounted) return; // Check if dialog is still open before showing error.
                           setDialogState(() => isSaving = false);
                           messenger.showSnackBar(
                             SnackBar(
@@ -390,6 +401,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
 
   ImageProvider<Object>? _buildCommentAvatar(Profile? profile, Comment comment) {
     final avatarUrl = profile?.avatarUrl?.trim();
+    // Anonymous comments should not show the user's profile image.
     if (comment.isAnonymous || avatarUrl == null || avatarUrl.isEmpty) {
       return null;
     }
@@ -471,7 +483,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
           }
 
           return RefreshIndicator(
-            onRefresh: _refreshData,
+            onRefresh: _refreshData, // Pull-to-refresh for the entire post detail page, including comments.
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
@@ -485,7 +497,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Posted ${post.createdAt.toString().substring(0, 16)}',
+                  'Posted ${post.createdAt.toString().substring(0, 16)}', // Show a substring of the timestamp for a cleaner look.
                   style: const TextStyle(color: Colors.grey),
                 ),
                 if (post.imageUrl != null) ...[
@@ -549,7 +561,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
                     ],
                     const Spacer(),
                     FilledButton(
-                      onPressed: _isSubmittingComment ? null : _addComment,
+                      onPressed: _isSubmittingComment ? null : _addComment, // Disable the button while submitting to prevent duplicate comments.
                       child: _isSubmittingComment
                           ? const SizedBox(
                               width: 20,
@@ -745,6 +757,7 @@ class _PostDetailPageState extends ConsumerState<PostDetailPage> {
     );
   }
 
+  // Clean up the comment input controller when the widget is disposed.
   @override
   void dispose() {
     _commentController.dispose();
