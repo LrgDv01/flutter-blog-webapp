@@ -90,7 +90,7 @@ class HomePage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Flutter Blog',
+          'Flutter Blog sdfdfsd',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         actions: [
